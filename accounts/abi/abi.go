@@ -124,9 +124,7 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 	for _, field := range fields {
 		switch field.Type {
 		case "constructor":
-			abi.Constructor = Method{
-				Inputs: field.Inputs,
-			}
+			abi.Constructor = NewMethod("", "", false, field.Inputs, nil)
 		// empty defaults to function according to the abi spec
 		case "function", "":
 			name := field.Name
@@ -136,13 +134,7 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 				_, ok = abi.Methods[name]
 			}
 			isConst := field.Constant || field.StateMutability == "pure" || field.StateMutability == "view"
-			abi.Methods[name] = Method{
-				Name:    name,
-				RawName: field.Name,
-				Const:   isConst,
-				Inputs:  field.Inputs,
-				Outputs: field.Outputs,
-			}
+			abi.Methods[name] = NewMethod(name, field.Name, isConst, field.Inputs, field.Outputs)
 		case "event":
 			name := field.Name
 			_, ok := abi.Events[name]

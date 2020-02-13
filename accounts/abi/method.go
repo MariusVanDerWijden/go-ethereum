@@ -47,6 +47,37 @@ type Method struct {
 	Const   bool
 	Inputs  Arguments
 	Outputs Arguments
+	// internal fields to prevent recalculation
+	sig string
+	id  []byte
+	str string
+}
+
+// NewMethod creates a new Method.
+// It also precomputes the sig representation and the string representation
+// of the method.
+// A method should always be created using NewMethod.
+func NewMethod(name string, rawName string, isConst bool, inputs Arguments, outputs Arguments) Method {
+	method := Method{
+		Name:    name,
+		RawName: rawName,
+		Const:   isConst,
+		Inputs:  inputs,
+		Outputs: outputs,
+	}
+	method.initFields()
+	return method
+}
+
+// initFields should only be used in the unit tests
+// to create valid Method objects from json.
+func (method *Method) initFields() {
+	// Calculate and set Signature
+	method.sig = method.calcSig()
+	// Calculate the method id as the first 4 bytes of the hash of sig.
+	method.id = crypto.Keccak256([]byte(method.sig))[:4]
+	// Calculate and set the String representation
+	method.str = method.calcString()
 }
 
 // Sig returns the methods string signature according to the ABI spec.
@@ -57,6 +88,21 @@ type Method struct {
 //
 // Please note that "int" is substitute for its canonical representation "int256"
 func (method Method) Sig() string {
+	return method.sig
+}
+
+func (method Method) String() string {
+	return method.str
+}
+
+// ID returns the canonical representation of the method's signature used by the
+// abi definition to identify method names and types.
+func (method Method) ID() []byte {
+	return method.id
+}
+
+// calcSig calculates the method string signature.
+func (method Method) calcSig() string {
 	types := make([]string, len(method.Inputs))
 	for i, input := range method.Inputs {
 		types[i] = input.Type.String()
@@ -64,7 +110,7 @@ func (method Method) Sig() string {
 	return fmt.Sprintf("%v(%v)", method.RawName, strings.Join(types, ","))
 }
 
-func (method Method) String() string {
+func (method Method) calcString() string {
 	inputs := make([]string, len(method.Inputs))
 	for i, input := range method.Inputs {
 		inputs[i] = fmt.Sprintf("%v %v", input.Type, input.Name)
@@ -81,10 +127,4 @@ func (method Method) String() string {
 		constant = "constant "
 	}
 	return fmt.Sprintf("function %v(%v) %sreturns(%v)", method.RawName, strings.Join(inputs, ", "), constant, strings.Join(outputs, ", "))
-}
-
-// ID returns the canonical representation of the method's signature used by the
-// abi definition to identify method names and types.
-func (method Method) ID() []byte {
-	return crypto.Keccak256([]byte(method.Sig()))[:4]
 }
