@@ -135,9 +135,9 @@ func (wc *WhisperClient) Post(ctx *Context, message *NewMessage) (string, error)
 	return wc.client.Post(ctx.context, *message.newMessage)
 }
 
-// NewHeadHandler is a client-side subscription callback to invoke on events and
+// MessageHandler is a client-side subscription callback to invoke on events and
 // subscription failure.
-type NewMessageHandler interface {
+type MessageHandler interface {
 	OnNewMessage(message *Message)
 	OnError(failure string)
 }
@@ -145,7 +145,7 @@ type NewMessageHandler interface {
 // SubscribeMessages subscribes to messages that match the given criteria. This method
 // is only supported on bi-directional connections such as websockets and IPC.
 // NewMessageFilter uses polling and is supported over HTTP.
-func (wc *WhisperClient) SubscribeMessages(ctx *Context, criteria *Criteria, handler NewMessageHandler, buffer int) (*Subscription, error) {
+func (wc *WhisperClient) SubscribeMessages(ctx *Context, criteria *Criteria, handler MessageHandler, buffer int) (*Subscription, error) {
 	// Subscribe to the event internally
 	ch := make(chan *whisper.Message, buffer)
 	rawSub, err := wc.client.SubscribeMessages(ctx.context, *criteria.criteria, ch)
