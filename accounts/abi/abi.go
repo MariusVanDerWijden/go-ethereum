@@ -86,7 +86,7 @@ func (abi ABI) Unpack(v interface{}, name string, data []byte) (err error) {
 	// we need to decide whether we're calling a method or an event
 	if method, ok := abi.Methods[name]; ok {
 		if len(data)%32 != 0 {
-			return fmt.Errorf("abi: improperly formatted output: %s - Bytes: [%+v]", string(data), data)
+			return fmt.Errorf("abi: improperly formatted output: length: %d - %s - Bytes: [%+v]", len(data), string(data), data)
 		}
 		return method.Outputs.Unpack(v, data)
 	}

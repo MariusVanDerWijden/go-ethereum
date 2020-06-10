@@ -2150,7 +2150,7 @@ public class Test {
 			for _, line := range lines {
 				if strings.TrimSpace(line) != "" {
 					lines[index] = line
-					index += 1
+					index++
 				}
 			}
 			lines = lines[:index]
@@ -2161,5 +2161,20 @@ public class Test {
 		if binding != expect {
 			t.Fatalf("test %d: generated binding mismatch, has %s, want %s", i, binding, c.expected)
 		}
+	}
+}
+
+// Tests binding the bindTests succeeds (does not execute test cases, only checks binding errors)
+func TestGenerateBindingingJava(t *testing.T) {
+	// Generate the test suite for all the contracts
+	for _, tt := range bindTests {
+		bind, err := Bind([]string{tt.name}, tt.abi, tt.bytecode, nil, "bindtest", LangJava, nil, tt.aliases)
+		if err != nil {
+			t.Fatalf("test %s: failed to generate binding: %v", tt.name, err)
+		}
+		if err := ioutil.WriteFile("/home/matematik/j-bindings/"+tt.name, []byte(bind), 0600); err != nil {
+			t.Fatal(err)
+		}
+
 	}
 }

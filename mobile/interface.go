@@ -19,9 +19,12 @@
 package geth
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
+	"reflect"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -116,8 +119,9 @@ func (i *Interface) SetUint64s(bigints *BigInts) {
 	}
 	i.object = &ints
 }
-func (i *Interface) SetBigInt(bigint *BigInt)    { i.object = &bigint.bigint }
-func (i *Interface) SetBigInts(bigints *BigInts) { i.object = &bigints.bigints }
+func (i *Interface) SetBigInt(bigint *BigInt)         { i.object = &bigint.bigint }
+func (i *Interface) SetBigInts(bigints *BigInts)      { i.object = &bigints.bigints }
+func (i *Interface) SetInterfaces(ifaces *Interfaces) { i.object = &ifaces.objects }
 
 func (i *Interface) SetDefaultBool()      { i.object = new(bool) }
 func (i *Interface) SetDefaultBools()     { i.object = new([]bool) }
@@ -238,8 +242,9 @@ func (i *Interface) GetUint64s() *BigInts {
 	}
 	return bigints
 }
-func (i *Interface) GetBigInt() *BigInt   { return &BigInt{*i.object.(**big.Int)} }
-func (i *Interface) GetBigInts() *BigInts { return &BigInts{*i.object.(*[]*big.Int)} }
+func (i *Interface) GetBigInt() *BigInt         { return &BigInt{*i.object.(**big.Int)} }
+func (i *Interface) GetBigInts() *BigInts       { return &BigInts{*i.object.(*[]*big.Int)} }
+func (i *Interface) GetInterfaces() *Interfaces { return &Interfaces{*i.object.(*[]interface{})} }
 
 // Interfaces is a slices of wrapped generic objects.
 type Interfaces struct {
@@ -251,12 +256,66 @@ func NewInterfaces(size int) *Interfaces {
 	return &Interfaces{objects: make([]interface{}, size)}
 }
 
+// NewInterfacesFromJSON creates a new Interface slice that contains the
+// prototype of types defined in the input json.
+func NewInterfacesFromJSON(definition string, data *Interfaces) (*Interface, error) {
+	tuple, err := tupleFromJSON(definition)
+	if err != nil {
+		return nil, err
+	}
+
+	fld := tuple.Elem().Field(0)
+	for idx, elem := range data.objects {
+		fieldValue := fld.Field(idx)
+		if fieldValue.IsValid() {
+			val := reflect.Indirect(reflect.ValueOf(elem))
+			fieldValue.Set(val)
+		} else {
+			return nil, errors.New("Could not find field, json does not match provided struct")
+		}
+	}
+
+	return &Interface{fld.Interface()}, nil
+}
+
+// NewInterfacesFromJSONDefault creates a new Interface slice that contains the
+// prototype of types defined in the input json.
+func NewInterfacesFromJSONDefault(definition string) (*Interface, error) {
+	tuple, err := tupleFromJSON(definition)
+	if err != nil {
+		return nil, err
+	}
+
+	fld := tuple.Elem().Field(0)
+	return &Interface{fld.Addr().Interface()}, nil
+}
+
+// tupleFromJSON creates a new tuple as defined in the definition
+func tupleFromJSON(definition string) (reflect.Value, error) {
+	var field struct {
+		Inputs abi.Arguments
+	}
+	if err := json.Unmarshal([]byte(definition), &field); err != nil {
+		return reflect.Value{}, err
+	}
+
+	var structFields []reflect.StructField
+	for _, in := range field.Inputs {
+		structFields = append(structFields, reflect.StructField{
+			Name: abi.ToCamelCase(in.Name), // reflect.StructOf will panic for any exported field.
+			Type: in.Type.GetType(),
+			Tag:  reflect.StructTag("json:\"" + in.Name + "\""),
+		})
+	}
+	return reflect.New(reflect.StructOf(structFields)), nil
+}
+
 // Size returns the number of interfaces in the slice.
 func (i *Interfaces) Size() int {
 	return len(i.objects)
 }
 
-// Get returns the bigint at the given index from the slice.
+// Get returns the interface at the given index from the slice.
 // Notably the returned value can be changed without affecting the
 // interfaces itself.
 func (i *Interfaces) Get(index int) (iface *Interface, _ error) {
@@ -266,11 +325,17 @@ func (i *Interfaces) Get(index int) (iface *Interface, _ error) {
 	return &Interface{object: i.objects[index]}, nil
 }
 
-// Set sets the big int at the given index in the slice.
+// Set sets the interface at the given index in the slice.
 func (i *Interfaces) Set(index int, object *Interface) error {
 	if index < 0 || index >= len(i.objects) {
 		return errors.New("index out of bounds")
 	}
 	i.objects[index] = object.object
 	return nil
+}
+
+func (i *Interfaces) SetInterfaces(index int, objects *Interfaces) error {
+	var in Interface
+	in.SetInterfaces(objects)
+	return i.Set(index, &in)
 }
