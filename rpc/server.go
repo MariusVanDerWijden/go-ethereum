@@ -20,7 +20,9 @@ import (
 	"context"
 	"io"
 	"sync/atomic"
+	"time"
 
+	raidenserver "github.com/MariusVanDerWijden/ShareMyRPC/server"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -38,6 +40,10 @@ const (
 
 	// OptionSubscriptions is an indication that the codec supports RPC notifications
 	OptionSubscriptions = 1 << iota // support pub sub
+
+	raidenUrl   = "http://localhost:5001/api/v1"
+	raidenToken = "0x95B2d84De40a0121061b105E6B54016a49621B44"
+	raidenPeer  = "0x1F916ab5cf1B30B22f24Ebf435f53Ee665344Acf"
 )
 
 // Server is an RPC server.
@@ -46,11 +52,16 @@ type Server struct {
 	idgen    func() ID
 	run      int32
 	codecs   mapset.Set
+	raiden   *raidenserver.Server
 }
 
 // NewServer creates a new server instance with no registered handlers.
 func NewServer() *Server {
-	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1}
+	rs, err := raidenserver.NewServer(raidenUrl, raidenToken, raidenPeer)
+	if err != nil {
+		log.Error("Could not start raiden server: %v", err)
+	}
+	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1, raiden: rs}
 	// Register the default service providing meta information about the RPC service such
 	// as the services and methods it offers.
 	rpcService := &RPCService{server}
@@ -106,6 +117,11 @@ func (s *Server) serveSingleRequest(ctx context.Context, codec ServerCodec) {
 		if err != io.EOF {
 			codec.writeJSON(ctx, errorMessage(&invalidMessageError{"parse error"}))
 		}
+		return
+	}
+	// Wait for a payment
+	if !s.raiden.PaymentReceived(ctx, 5*time.Second) {
+		log.Error("No payment received for call")
 		return
 	}
 	if batch {
