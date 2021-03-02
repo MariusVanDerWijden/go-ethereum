@@ -49,9 +49,10 @@ func (h *nonceHeap) Pop() interface{} {
 // txSortedMap is a nonce->transaction hash map with a heap based index to allow
 // iterating over the contents in a nonce-incrementing way.
 type txSortedMap struct {
-	items map[uint64]*types.Transaction // Hash map storing the transaction data
-	index *nonceHeap                    // Heap of nonces of all the stored transactions (non-strict mode)
-	cache types.Transactions            // Cache of the transactions already sorted
+	items    map[uint64]*types.Transaction // Hash map storing the transaction data
+	index    *nonceHeap                    // Heap of nonces of all the stored transactions (non-strict mode)
+	maxNonce uint64                        // cache of the current highest nonce
+	cache    types.Transactions            // Cache of the transactions already sorted
 }
 
 // newTxSortedMap creates a new nonce-sorted transaction map.
@@ -74,6 +75,9 @@ func (m *txSortedMap) Put(tx *types.Transaction) {
 	if m.items[nonce] == nil {
 		heap.Push(m.index, nonce)
 	}
+	if nonce > m.maxNonce {
+		m.maxNonce = nonce
+	}
 	m.items[nonce], m.cache = tx, nil
 }
 
@@ -88,6 +92,10 @@ func (m *txSortedMap) Forward(threshold uint64) types.Transactions {
 		nonce := heap.Pop(m.index).(uint64)
 		removed = append(removed, m.items[nonce])
 		delete(m.items, nonce)
+	}
+	// If we pop'd all elements then reset the max nonce
+	if m.index.Len() == 0 {
+		m.maxNonce = 0
 	}
 	// If we had a cached order, shift the front
 	if m.cache != nil {
@@ -116,6 +124,10 @@ func (m *txSortedMap) reheap() {
 		*m.index = append(*m.index, nonce)
 	}
 	heap.Init(m.index)
+	// If the txSortedMap is empty, reset max nonce
+	if len(m.items) == 0 {
+		m.maxNonce = 0
+	}
 	m.cache = nil
 }
 
@@ -159,6 +171,13 @@ func (m *txSortedMap) Cap(threshold int) types.Transactions {
 	if m.cache != nil {
 		m.cache = m.cache[:len(m.cache)-len(drops)]
 	}
+	// Set the new max nonce
+	if threshold == 0 {
+		m.maxNonce = 0
+	} else {
+		m.maxNonce = m.items[(*m.index)[threshold-1]].Nonce()
+	}
+
 	return drops
 }
 
@@ -179,7 +198,16 @@ func (m *txSortedMap) Remove(nonce uint64) bool {
 	}
 	delete(m.items, nonce)
 	m.cache = nil
-
+	if nonce == m.maxNonce {
+		if len(m.items) != 0 {
+			item := m.items[(*m.index)[len(m.items)-1]]
+			if item != nil {
+				m.maxNonce = item.Nonce()
+				return true
+			}
+		}
+		m.maxNonce = 0
+	}
 	return true
 }
 
@@ -203,6 +231,9 @@ func (m *txSortedMap) Ready(start uint64) types.Transactions {
 		heap.Pop(m.index)
 	}
 	m.cache = nil
+	if m.index.Len() == 0 {
+		m.maxNonce = 0
+	}
 
 	return ready
 }
@@ -238,8 +269,10 @@ func (m *txSortedMap) Flatten() types.Transactions {
 // LastElement returns the last element of a flattened list, thus, the
 // transaction with the highest nonce
 func (m *txSortedMap) LastElement() *types.Transaction {
-	cache := m.flatten()
-	return cache[len(cache)-1]
+	if len(m.items) == 0 {
+		return types.NewTx(&types.LegacyTx{})
+	}
+	return m.items[m.maxNonce]
 }
 
 // txList is a "list" of transactions belonging to an account, sorted by account
