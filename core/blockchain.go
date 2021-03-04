@@ -1926,6 +1926,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 			return it.index, err
 		}
 		proctime := time.Since(start)
+		if block.NumberU64()%30 == 0 {
+			bc.reportBlock(block, receipts, err)
+		}
 
 		// Update the metrics touched during block validation
 		accountHashTimer.Update(statedb.AccountHashes) // Account hashes are complete, we can mark them
