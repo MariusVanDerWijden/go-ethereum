@@ -173,7 +173,7 @@ func (api *ConsensusAPI) makeEnv(parent *types.Block, header *types.Header) (*bl
 	return env, nil
 }
 
-func (api *ConsensusAPI) GetPayload(PayloadID hexutil.Uint64) (*ExecutableDataV1, error) {
+func (api *ConsensusAPI) GetPayloadV1(PayloadID hexutil.Uint64) (*ExecutableDataV1, error) {
 	data, ok := api.preparedBlocks[uint64(PayloadID)]
 	if !ok {
 		return nil, &UnknownPayload
@@ -181,38 +181,36 @@ func (api *ConsensusAPI) GetPayload(PayloadID hexutil.Uint64) (*ExecutableDataV1
 	return data, nil
 }
 
-func (api *ConsensusAPI) ForkchoiceUpdatedV1(params ForkChoiceParams) (GenericStringResponse, error) {
+func (api *ConsensusAPI) ForkchoiceUpdatedV1(HeadBlockHash, SafeBlockHash, FinalizedBlockHash common.Hash, PayloadAttributes *PayloadAttributesV1) (GenericStringResponse, error) {
 	var emptyHash = common.Hash{}
-	if !bytes.Equal(params.HeadBlockHash[:], emptyHash[:]) {
-		if err := api.checkTerminalTotalDifficulty(params.HeadBlockHash); err != nil {
+	if !bytes.Equal(HeadBlockHash[:], emptyHash[:]) {
+		if err := api.checkTerminalTotalDifficulty(HeadBlockHash); err != nil {
+			if block := api.eth.BlockChain().GetBlockByHash(HeadBlockHash); block == nil {
+				// TODO (MariusVanDerWijden) trigger sync
+				return SYNCING, nil
+			}
 			return INVALID, err
 		}
-		if !api.eth.Synced() {
-			return SYNCING, nil
-		}
-		if block := api.eth.BlockChain().GetBlockByHash(params.HeadBlockHash); block == nil {
-			// TODO (MariusVanDerWijden) trigger sync
-			return SYNCING, nil
-		}
 		// If the finalized block is set, check if it is in our blockchain
-		if !bytes.Equal(params.FinalizedBlockHash[:], emptyHash[:]) {
-			if block := api.eth.BlockChain().GetBlockByHash(params.FinalizedBlockHash); block == nil {
+		if !bytes.Equal(FinalizedBlockHash[:], emptyHash[:]) {
+			if block := api.eth.BlockChain().GetBlockByHash(FinalizedBlockHash); block == nil {
 				// TODO (MariusVanDerWijden) trigger sync
 				return SYNCING, nil
 			}
 		}
 		// SetHead
-		if err := api.setHead(params.HeadBlockHash); err != nil {
+		if err := api.setHead(HeadBlockHash); err != nil {
 			return INVALID, err
 		}
 		// Assemble block (if needed)
-		if params.PayloadAttributes != nil {
-			data, err := api.assembleBlock(*params.PayloadAttributes)
+		if PayloadAttributes != nil {
+			data, err := api.assembleBlock(*PayloadAttributes)
 			if err != nil {
 				return INVALID, err
 			}
-			id := computePayloadId(params.HeadBlockHash, params.PayloadAttributes)
+			id := computePayloadId(HeadBlockHash, PayloadAttributes)
 			api.preparedBlocks[id] = data
+			log.Info("Created payload", "payloadid", id)
 			// TODO (MariusVanDerWijden) do something with the payloadID?
 			return VALID, nil
 		}
@@ -473,6 +471,10 @@ func (api *ConsensusAPI) checkTerminalTotalDifficulty(head common.Hash) error {
 	}
 	parent := api.eth.BlockChain().GetBlockByHash(newHeadBlock.ParentHash())
 	if parent == nil {
+		// Special case, the genesis block has no parent
+		if newHeadBlock.NumberU64() == 0 {
+			return nil
+		}
 		return fmt.Errorf("parent unavailable: %v", newHeadBlock.ParentHash())
 	}
 	td := api.eth.BlockChain().GetTd(parent.Hash(), parent.NumberU64())
@@ -484,11 +486,6 @@ func (api *ConsensusAPI) checkTerminalTotalDifficulty(head common.Hash) error {
 
 // setHead is called to perform a force choice.
 func (api *ConsensusAPI) setHead(newHead common.Hash) error {
-	// Trigger the transition if it's the first `NewHead` event.
-	merger := api.merger()
-	if !merger.PoSFinalized() {
-		merger.FinalizePoS()
-	}
 	log.Info("Setting head", "head", newHead)
 	if api.light {
 		headHeader := api.les.BlockChain().CurrentHeader()
@@ -501,6 +498,11 @@ func (api *ConsensusAPI) setHead(newHead common.Hash) error {
 		}
 		if err := api.les.BlockChain().SetChainHead(newHeadHeader); err != nil {
 			return err
+		}
+		// Trigger the transition if it's the first `NewHead` event.
+		merger := api.merger()
+		if !merger.PoSFinalized() {
+			merger.FinalizePoS()
 		}
 		return nil
 	}
@@ -515,6 +517,12 @@ func (api *ConsensusAPI) setHead(newHead common.Hash) error {
 	if err := api.eth.BlockChain().SetChainHead(newHeadBlock); err != nil {
 		return err
 	}
+	// Trigger the transition if it's the first `NewHead` event.
+	merger := api.merger()
+	if !merger.PoSFinalized() {
+		merger.FinalizePoS()
+	}
+	// TODO (MariusVanDerWijden) are we really synced now?
 	api.eth.SetSynced()
 	return nil
 }

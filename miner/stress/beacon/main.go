@@ -146,14 +146,14 @@ func (n *ethNode) assembleBlock(parentHash common.Hash, parentTimestamp uint64) 
 		ParentHash: parentHash,
 		Timestamp:  uint64(time.Now().Unix()),
 	}
-	payload, err := n.api.ForkchoiceUpdatedV1(catalyst.ForkChoiceParams{HeadBlockHash: parentHash, PayloadAttributes: &payloadAttribute})
+	payload, err := n.api.ForkchoiceUpdatedV1(parentHash, common.Hash{}, common.Hash{}, &payloadAttribute)
 	if err != nil {
 		return nil, err
 	}
 	// TODO (MariusVanDerWijden) compute payload id
 	_ = payload
 	payloadid := 0
-	return n.api.GetPayload(hexutil.Uint64(payloadid))
+	return n.api.GetPayloadV1(hexutil.Uint64(payloadid))
 }
 
 func (n *ethNode) insertBlock(eb catalyst.ExecutableDataV1) error {
@@ -180,7 +180,7 @@ func (n *ethNode) insertBlockAndSetHead(parent *types.Header, ed catalyst.Execut
 	if err != nil {
 		return err
 	}
-	if _, err := n.api.ForkchoiceUpdatedV1(catalyst.ForkChoiceParams{HeadBlockHash: block.Hash()}); err != nil {
+	if _, err := n.api.ForkchoiceUpdatedV1(block.Hash(), common.Hash{}, common.Hash{}, nil); err != nil {
 		return err
 	}
 	return nil
@@ -279,7 +279,7 @@ func (mgr *nodeManager) run() {
 		nodes = append(nodes, mgr.getNodes(eth2NormalNode)...)
 		nodes = append(nodes, mgr.getNodes(eth2LightClient)...)
 		for _, node := range append(nodes) {
-			node.api.ForkchoiceUpdatedV1(catalyst.ForkChoiceParams{HeadBlockHash: oldest.Hash()})
+			node.api.ForkchoiceUpdatedV1(oldest.Hash(), common.Hash{}, common.Hash{}, nil)
 		}
 		log.Info("Finalised eth2 block", "number", oldest.NumberU64(), "hash", oldest.Hash())
 		waitFinalise = waitFinalise[1:]

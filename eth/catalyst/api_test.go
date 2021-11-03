@@ -127,7 +127,7 @@ func TestSetHeadBeforeTotalDifficulty(t *testing.T) {
 
 	api := NewConsensusAPI(ethservice, nil)
 
-	if _, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{HeadBlockHash: blocks[5].Hash()}); err == nil {
+	if _, err := api.ForkchoiceUpdatedV1(blocks[5].Hash(), common.Hash{}, common.Hash{}, nil); err == nil {
 		t.Errorf("fork choice updated before total terminal difficulty should fail")
 	}
 }
@@ -147,12 +147,12 @@ func TestEth2PrepareAndGetPayload(t *testing.T) {
 		ParentHash: blocks[8].Hash(),
 		Timestamp:  blocks[8].Time() + 5,
 	}
-	_, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{HeadBlockHash: blockParams.ParentHash, PayloadAttributes: &blockParams})
+	_, err := api.ForkchoiceUpdatedV1(blockParams.ParentHash, common.Hash{}, common.Hash{}, &blockParams)
 	if err != nil {
 		t.Fatalf("error preparing payload, err=%v", err)
 	}
 	payloadID := computePayloadId(blockParams.ParentHash, &blockParams)
-	execData, err := api.GetPayload(hexutil.Uint64(payloadID))
+	execData, err := api.GetPayloadV1(hexutil.Uint64(payloadID))
 	if err != nil {
 		t.Fatalf("error getting payload, err=%v", err)
 	}
@@ -224,7 +224,7 @@ func TestEth2NewBlock(t *testing.T) {
 		}
 		checkLogEvents(t, newLogCh, rmLogsCh, 0, 0)
 
-		if _, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{HeadBlockHash: block.Hash(), FinalizedBlockHash: block.Hash()}); err != nil {
+		if _, err := api.ForkchoiceUpdatedV1(block.Hash(), block.Hash(), block.Hash(), nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != block.NumberU64() {
@@ -259,7 +259,7 @@ func TestEth2NewBlock(t *testing.T) {
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != head {
 			t.Fatalf("Chain head shouldn't be updated")
 		}
-		if _, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{FinalizedBlockHash: block.Hash(), HeadBlockHash: block.Hash()}); err != nil {
+		if _, err := api.ForkchoiceUpdatedV1(block.Hash(), block.Hash(), block.Hash(), nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != block.NumberU64() {
@@ -365,7 +365,7 @@ func TestFullAPI(t *testing.T) {
 			Random:       crypto.Keccak256Hash([]byte{byte(i)}),
 			FeeRecipient: parent.Coinbase(),
 		}
-		resp, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{HeadBlockHash: params.ParentHash, PayloadAttributes: &params})
+		resp, err := api.ForkchoiceUpdatedV1(params.ParentHash, common.Hash{}, common.Hash{}, &params)
 		if err != nil {
 			t.Fatalf("error preparing payload, err=%v", err)
 		}
@@ -373,7 +373,7 @@ func TestFullAPI(t *testing.T) {
 			t.Fatalf("error preparing payload, invalid status: %v", resp.Status)
 		}
 		payloadID := computePayloadId(params.ParentHash, &params)
-		payload, err := api.GetPayload(hexutil.Uint64(payloadID))
+		payload, err := api.GetPayloadV1(hexutil.Uint64(payloadID))
 		if err != nil {
 			t.Fatalf("can't get payload: %v", err)
 		}
@@ -384,7 +384,7 @@ func TestFullAPI(t *testing.T) {
 		if execResp.Status != VALID.Status {
 			t.Fatalf("invalid status: %v", execResp.Status)
 		}
-		if _, err := api.ForkchoiceUpdatedV1(ForkChoiceParams{HeadBlockHash: payload.BlockHash, FinalizedBlockHash: payload.BlockHash}); err != nil {
+		if _, err := api.ForkchoiceUpdatedV1(payload.BlockHash, payload.BlockHash, payload.BlockHash, nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != payload.Number {

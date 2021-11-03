@@ -103,9 +103,11 @@ type ConsensusValidatedParams struct {
 	Status    string      `json:"status"`
 }
 
+//go:generate go run github.com/fjl/gencodec -type ForkChoiceParams -out gen_forkchoice.go
+
 type ForkChoiceParams struct {
 	HeadBlockHash      common.Hash          `json:"headBlockHash"`
 	SafeBlockHash      common.Hash          `json:"safeBlockHash"`
 	FinalizedBlockHash common.Hash          `json:"finalizedBlockHash"`
-	PayloadAttributes  *PayloadAttributesV1 `json:"payloadAttributes"`
+	PayloadAttributes  *PayloadAttributesV1 `json:"payloadAttributes" gencodec:"optional"`
 }
