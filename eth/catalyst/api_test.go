@@ -126,8 +126,12 @@ func TestSetHeadBeforeTotalDifficulty(t *testing.T) {
 	defer n.Close()
 
 	api := NewConsensusAPI(ethservice, nil)
-
-	if _, err := api.ForkchoiceUpdatedV1(blocks[5].Hash(), common.Hash{}, common.Hash{}, nil); err == nil {
+	fcState := ForkchoiceStateV1{
+		HeadBlockHash:      blocks[5].Hash(),
+		SafeBlockHash:      common.Hash{},
+		FinalizedBlockHash: common.Hash{},
+	}
+	if _, err := api.ForkchoiceUpdatedV1(fcState, nil); err == nil {
 		t.Errorf("fork choice updated before total terminal difficulty should fail")
 	}
 }
@@ -147,12 +151,17 @@ func TestEth2PrepareAndGetPayload(t *testing.T) {
 		ParentHash: blocks[8].Hash(),
 		Timestamp:  blocks[8].Time() + 5,
 	}
-	_, err := api.ForkchoiceUpdatedV1(blockParams.ParentHash, common.Hash{}, common.Hash{}, &blockParams)
+	fcState := ForkchoiceStateV1{
+		HeadBlockHash:      blockParams.ParentHash,
+		SafeBlockHash:      common.Hash{},
+		FinalizedBlockHash: common.Hash{},
+	}
+	_, err := api.ForkchoiceUpdatedV1(fcState, &blockParams)
 	if err != nil {
 		t.Fatalf("error preparing payload, err=%v", err)
 	}
 	payloadID := computePayloadId(blockParams.ParentHash, &blockParams)
-	execData, err := api.GetPayloadV1(hexutil.Uint64(payloadID))
+	execData, err := api.GetPayloadV1(hexutil.Bytes(payloadID))
 	if err != nil {
 		t.Fatalf("error getting payload, err=%v", err)
 	}
@@ -223,8 +232,12 @@ func TestEth2NewBlock(t *testing.T) {
 			t.Fatalf("Chain head shouldn't be updated")
 		}
 		checkLogEvents(t, newLogCh, rmLogsCh, 0, 0)
-
-		if _, err := api.ForkchoiceUpdatedV1(block.Hash(), block.Hash(), block.Hash(), nil); err != nil {
+		fcState := ForkchoiceStateV1{
+			HeadBlockHash:      block.Hash(),
+			SafeBlockHash:      block.Hash(),
+			FinalizedBlockHash: block.Hash(),
+		}
+		if _, err := api.ForkchoiceUpdatedV1(fcState, nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != block.NumberU64() {
@@ -259,7 +272,13 @@ func TestEth2NewBlock(t *testing.T) {
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != head {
 			t.Fatalf("Chain head shouldn't be updated")
 		}
-		if _, err := api.ForkchoiceUpdatedV1(block.Hash(), block.Hash(), block.Hash(), nil); err != nil {
+
+		fcState := ForkchoiceStateV1{
+			HeadBlockHash:      block.Hash(),
+			SafeBlockHash:      block.Hash(),
+			FinalizedBlockHash: block.Hash(),
+		}
+		if _, err := api.ForkchoiceUpdatedV1(fcState, nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != block.NumberU64() {
@@ -365,7 +384,12 @@ func TestFullAPI(t *testing.T) {
 			Random:       crypto.Keccak256Hash([]byte{byte(i)}),
 			FeeRecipient: parent.Coinbase(),
 		}
-		resp, err := api.ForkchoiceUpdatedV1(params.ParentHash, common.Hash{}, common.Hash{}, &params)
+		fcState := ForkchoiceStateV1{
+			HeadBlockHash:      params.ParentHash,
+			SafeBlockHash:      common.Hash{},
+			FinalizedBlockHash: common.Hash{},
+		}
+		resp, err := api.ForkchoiceUpdatedV1(fcState, &params)
 		if err != nil {
 			t.Fatalf("error preparing payload, err=%v", err)
 		}
@@ -373,7 +397,7 @@ func TestFullAPI(t *testing.T) {
 			t.Fatalf("error preparing payload, invalid status: %v", resp.Status)
 		}
 		payloadID := computePayloadId(params.ParentHash, &params)
-		payload, err := api.GetPayloadV1(hexutil.Uint64(payloadID))
+		payload, err := api.GetPayloadV1(hexutil.Bytes(payloadID))
 		if err != nil {
 			t.Fatalf("can't get payload: %v", err)
 		}
@@ -384,7 +408,12 @@ func TestFullAPI(t *testing.T) {
 		if execResp.Status != VALID.Status {
 			t.Fatalf("invalid status: %v", execResp.Status)
 		}
-		if _, err := api.ForkchoiceUpdatedV1(payload.BlockHash, payload.BlockHash, payload.BlockHash, nil); err != nil {
+		fcState = ForkchoiceStateV1{
+			HeadBlockHash:      payload.BlockHash,
+			SafeBlockHash:      payload.ParentHash,
+			FinalizedBlockHash: payload.ParentHash,
+		}
+		if _, err := api.ForkchoiceUpdatedV1(fcState, nil); err != nil {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 		if ethservice.BlockChain().CurrentBlock().NumberU64() != payload.Number {

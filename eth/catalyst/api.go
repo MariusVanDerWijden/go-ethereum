@@ -45,8 +45,8 @@ import (
 
 var (
 	VALID          = GenericStringResponse{"VALID"}
-	INVALID        = GenericStringResponse{"INVALID"}
-	SYNCING        = GenericStringResponse{"SYNCING"}
+	INVALID        = ForkChoiceResponse{Status: "INVALID", PayloadID: nil}
+	SYNCING        = ForkChoiceResponse{Status: "INVALID", PayloadID: nil}
 	UnknownHeader  = rpc.CustomError{Code: -32000, Message: "unknown header"}
 	UnknownPayload = rpc.CustomError{Code: -32001, Message: "unknown payload"}
 )
@@ -173,33 +173,35 @@ func (api *ConsensusAPI) makeEnv(parent *types.Block, header *types.Header) (*bl
 	return env, nil
 }
 
-func (api *ConsensusAPI) GetPayloadV1(PayloadID hexutil.Uint64) (*ExecutableDataV1, error) {
-	data, ok := api.preparedBlocks[uint64(PayloadID)]
+func (api *ConsensusAPI) GetPayloadV1(PayloadID hexutil.Bytes) (*ExecutableDataV1, error) {
+	hash := []byte(PayloadID)
+	id := binary.BigEndian.Uint64(hash[:8])
+	data, ok := api.preparedBlocks[id]
 	if !ok {
 		return nil, &UnknownPayload
 	}
 	return data, nil
 }
 
-func (api *ConsensusAPI) ForkchoiceUpdatedV1(HeadBlockHash, SafeBlockHash, FinalizedBlockHash common.Hash, PayloadAttributes *PayloadAttributesV1) (GenericStringResponse, error) {
+func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads ForkchoiceStateV1, PayloadAttributes *PayloadAttributesV1) (ForkChoiceResponse, error) {
 	var emptyHash = common.Hash{}
-	if !bytes.Equal(HeadBlockHash[:], emptyHash[:]) {
-		if err := api.checkTerminalTotalDifficulty(HeadBlockHash); err != nil {
-			if block := api.eth.BlockChain().GetBlockByHash(HeadBlockHash); block == nil {
+	if !bytes.Equal(heads.HeadBlockHash[:], emptyHash[:]) {
+		if err := api.checkTerminalTotalDifficulty(heads.HeadBlockHash); err != nil {
+			if block := api.eth.BlockChain().GetBlockByHash(heads.HeadBlockHash); block == nil {
 				// TODO (MariusVanDerWijden) trigger sync
 				return SYNCING, nil
 			}
 			return INVALID, err
 		}
 		// If the finalized block is set, check if it is in our blockchain
-		if !bytes.Equal(FinalizedBlockHash[:], emptyHash[:]) {
-			if block := api.eth.BlockChain().GetBlockByHash(FinalizedBlockHash); block == nil {
+		if !bytes.Equal(heads.FinalizedBlockHash[:], emptyHash[:]) {
+			if block := api.eth.BlockChain().GetBlockByHash(heads.FinalizedBlockHash); block == nil {
 				// TODO (MariusVanDerWijden) trigger sync
 				return SYNCING, nil
 			}
 		}
 		// SetHead
-		if err := api.setHead(HeadBlockHash); err != nil {
+		if err := api.setHead(heads.HeadBlockHash); err != nil {
 			return INVALID, err
 		}
 		// Assemble block (if needed)
@@ -208,24 +210,25 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(HeadBlockHash, SafeBlockHash, Final
 			if err != nil {
 				return INVALID, err
 			}
-			id := computePayloadId(HeadBlockHash, PayloadAttributes)
+			hash := computePayloadId(heads.HeadBlockHash, PayloadAttributes)
+			id := binary.BigEndian.Uint64(hash)
 			api.preparedBlocks[id] = data
 			log.Info("Created payload", "payloadid", id)
 			// TODO (MariusVanDerWijden) do something with the payloadID?
-			return VALID, nil
+			return ForkChoiceResponse{Status: "VALID", PayloadID: hash}, nil
 		}
 	}
-	return VALID, nil
+	return ForkChoiceResponse{Status: "VALID", PayloadID: nil}, nil
 }
 
-func computePayloadId(headBlockHash common.Hash, params *PayloadAttributesV1) uint64 {
+func computePayloadId(headBlockHash common.Hash, params *PayloadAttributesV1) []byte {
 	input := make([]byte, 32+8+32+20)
 	copy(input, headBlockHash[:])
 	binary.BigEndian.PutUint64(input[32:], params.Timestamp)
 	copy(input[40:], params.Random[:])
 	copy(input[72:], params.FeeRecipient[:])
 	hash := sha256.Sum256(input)
-	return binary.BigEndian.Uint64(hash[:8])
+	return hash[:8]
 }
 
 func (api *ConsensusAPI) invalid() ExecutePayloadResponse {
