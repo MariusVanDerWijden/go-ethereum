@@ -45,6 +45,7 @@ import (
 
 var (
 	VALID          = GenericStringResponse{"VALID"}
+	SUCCESS        = GenericStringResponse{"SUCCESS"}
 	INVALID        = ForkChoiceResponse{Status: "INVALID", PayloadID: nil}
 	SYNCING        = ForkChoiceResponse{Status: "INVALID", PayloadID: nil}
 	UnknownHeader  = rpc.CustomError{Code: -32000, Message: "unknown header"}
@@ -215,10 +216,10 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads ForkchoiceStateV1, PayloadAtt
 			api.preparedBlocks[id] = data
 			log.Info("Created payload", "payloadid", id)
 			// TODO (MariusVanDerWijden) do something with the payloadID?
-			return ForkChoiceResponse{Status: "VALID", PayloadID: hash}, nil
+			return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: hash}, nil
 		}
 	}
-	return ForkChoiceResponse{Status: "VALID", PayloadID: nil}, nil
+	return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: nil}, nil
 }
 
 func computePayloadId(headBlockHash common.Hash, params *PayloadAttributesV1) []byte {

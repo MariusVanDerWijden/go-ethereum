@@ -393,7 +393,7 @@ func TestFullAPI(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error preparing payload, err=%v", err)
 		}
-		if resp.Status != VALID.Status {
+		if resp.Status != SUCCESS.Status {
 			t.Fatalf("error preparing payload, invalid status: %v", resp.Status)
 		}
 		payloadID := computePayloadId(params.ParentHash, &params)
