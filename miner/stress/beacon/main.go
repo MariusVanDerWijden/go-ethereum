@@ -142,8 +142,7 @@ func (n *ethNode) assembleBlock(parentHash common.Hash, parentTimestamp uint64) 
 		return nil, errors.New("invalid node type")
 	}
 	payloadAttribute := catalyst.PayloadAttributesV1{
-		ParentHash: parentHash,
-		Timestamp:  uint64(time.Now().Unix()),
+		Timestamp: uint64(time.Now().Unix()),
 	}
 	fcState := catalyst.ForkchoiceStateV1{
 		HeadBlockHash:      parentHash,

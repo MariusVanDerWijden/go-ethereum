@@ -27,7 +27,6 @@ import (
 
 // Structure described at https://github.com/ethereum/execution-apis/pull/74
 type PayloadAttributesV1 struct {
-	ParentHash   common.Hash    `json:"parentHash"    gencodec:"required"`
 	Timestamp    uint64         `json:"timestamp"     gencodec:"required"`
 	Random       common.Hash    `json:"random"        gencodec:"required"`
 	FeeRecipient common.Address `json:"feeRecipient"  gencodec:"required"`

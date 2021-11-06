@@ -15,13 +15,11 @@ var _ = (*payloadAttributesMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (p PayloadAttributesV1) MarshalJSON() ([]byte, error) {
 	type PayloadAttributesV1 struct {
-		ParentHash   common.Hash    `json:"parentHash"    gencodec:"required"`
 		Timestamp    hexutil.Uint64 `json:"timestamp"     gencodec:"required"`
 		Random       common.Hash    `json:"random"        gencodec:"required"`
 		FeeRecipient common.Address `json:"feeRecipient"  gencodec:"required"`
 	}
 	var enc PayloadAttributesV1
-	enc.ParentHash = p.ParentHash
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
 	enc.Random = p.Random
 	enc.FeeRecipient = p.FeeRecipient
@@ -31,7 +29,6 @@ func (p PayloadAttributesV1) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 	type PayloadAttributesV1 struct {
-		ParentHash   *common.Hash    `json:"parentHash"    gencodec:"required"`
 		Timestamp    *hexutil.Uint64 `json:"timestamp"     gencodec:"required"`
 		Random       *common.Hash    `json:"random"        gencodec:"required"`
 		FeeRecipient *common.Address `json:"feeRecipient"  gencodec:"required"`
@@ -40,10 +37,6 @@ func (p *PayloadAttributesV1) UnmarshalJSON(input []byte) error {
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
-	if dec.ParentHash == nil {
-		return errors.New("missing required field 'parentHash' for PayloadAttributesV1")
-	}
-	p.ParentHash = *dec.ParentHash
 	if dec.Timestamp == nil {
 		return errors.New("missing required field 'timestamp' for PayloadAttributesV1")
 	}

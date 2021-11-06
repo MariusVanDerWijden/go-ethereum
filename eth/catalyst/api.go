@@ -207,7 +207,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads ForkchoiceStateV1, PayloadAtt
 		}
 		// Assemble block (if needed)
 		if PayloadAttributes != nil {
-			data, err := api.assembleBlock(*PayloadAttributes)
+			data, err := api.assembleBlock(heads.HeadBlockHash, PayloadAttributes)
 			if err != nil {
 				return INVALID, err
 			}
@@ -283,17 +283,17 @@ func (api *ConsensusAPI) ExecutePayloadV1(params ExecutableDataV1) (ExecutePaylo
 
 // AssembleBlock creates a new block, inserts it into the chain, and returns the "execution
 // data" required for eth2 clients to process the new block.
-func (api *ConsensusAPI) assembleBlock(params PayloadAttributesV1) (*ExecutableDataV1, error) {
+func (api *ConsensusAPI) assembleBlock(parentHash common.Hash, params *PayloadAttributesV1) (*ExecutableDataV1, error) {
 	if api.light {
 		return nil, errors.New("not supported")
 	}
-	log.Info("Producing block", "parentHash", params.ParentHash)
+	log.Info("Producing block", "parentHash", parentHash)
 
 	bc := api.eth.BlockChain()
-	parent := bc.GetBlockByHash(params.ParentHash)
+	parent := bc.GetBlockByHash(parentHash)
 	if parent == nil {
-		log.Warn("Cannot assemble block with parent hash to unknown block", "parentHash", params.ParentHash)
-		return nil, fmt.Errorf("cannot assemble block with unknown parent %s", params.ParentHash)
+		log.Warn("Cannot assemble block with parent hash to unknown block", "parentHash", parentHash)
+		return nil, fmt.Errorf("cannot assemble block with unknown parent %s", parentHash)
 	}
 
 	if params.Timestamp < parent.Time() {

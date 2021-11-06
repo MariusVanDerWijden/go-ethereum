@@ -86,10 +86,9 @@ func TestEth2AssembleBlock(t *testing.T) {
 	}
 	ethservice.TxPool().AddLocal(tx)
 	blockParams := PayloadAttributesV1{
-		ParentHash: blocks[9].Hash(),
-		Timestamp:  blocks[9].Time() + 5,
+		Timestamp: blocks[9].Time() + 5,
 	}
-	execData, err := api.assembleBlock(blockParams)
+	execData, err := api.assembleBlock(blocks[9].Hash(), &blockParams)
 	if err != nil {
 		t.Fatalf("error producing block, err=%v", err)
 	}
@@ -108,10 +107,9 @@ func TestEth2AssembleBlockWithAnotherBlocksTxs(t *testing.T) {
 	// Put the 10th block's tx in the pool and produce a new block
 	api.insertTransactions(blocks[9].Transactions())
 	blockParams := PayloadAttributesV1{
-		ParentHash: blocks[8].Hash(),
-		Timestamp:  blocks[8].Time() + 5,
+		Timestamp: blocks[8].Time() + 5,
 	}
-	execData, err := api.assembleBlock(blockParams)
+	execData, err := api.assembleBlock(blocks[8].Hash(), &blockParams)
 	if err != nil {
 		t.Fatalf("error producing block, err=%v", err)
 	}
@@ -148,11 +146,10 @@ func TestEth2PrepareAndGetPayload(t *testing.T) {
 	// Put the 10th block's tx in the pool and produce a new block
 	api.insertTransactions(blocks[9].Transactions())
 	blockParams := PayloadAttributesV1{
-		ParentHash: blocks[8].Hash(),
-		Timestamp:  blocks[8].Time() + 5,
+		Timestamp: blocks[8].Time() + 5,
 	}
 	fcState := ForkchoiceStateV1{
-		HeadBlockHash:      blockParams.ParentHash,
+		HeadBlockHash:      blocks[8].Hash(),
 		SafeBlockHash:      common.Hash{},
 		FinalizedBlockHash: common.Hash{},
 	}
@@ -160,7 +157,7 @@ func TestEth2PrepareAndGetPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error preparing payload, err=%v", err)
 	}
-	payloadID := computePayloadId(blockParams.ParentHash, &blockParams)
+	payloadID := computePayloadId(fcState.HeadBlockHash, &blockParams)
 	execData, err := api.GetPayloadV1(hexutil.Bytes(payloadID))
 	if err != nil {
 		t.Fatalf("error getting payload, err=%v", err)
@@ -213,9 +210,8 @@ func TestEth2NewBlock(t *testing.T) {
 		tx, _ := types.SignTx(types.NewContractCreation(nonce, new(big.Int), 1000000, big.NewInt(2*params.InitialBaseFee), logCode), types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 		ethservice.TxPool().AddLocal(tx)
 
-		execData, err := api.assembleBlock(PayloadAttributesV1{
-			ParentHash: parent.Hash(),
-			Timestamp:  parent.Time() + 5,
+		execData, err := api.assembleBlock(parent.Hash(), &PayloadAttributesV1{
+			Timestamp: parent.Time() + 5,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create the executable data %v", err)
@@ -254,9 +250,8 @@ func TestEth2NewBlock(t *testing.T) {
 	)
 	parent = preMergeBlocks[len(preMergeBlocks)-1]
 	for i := 0; i < 10; i++ {
-		execData, err := api.assembleBlock(PayloadAttributesV1{
-			ParentHash: parent.Hash(),
-			Timestamp:  parent.Time() + 6,
+		execData, err := api.assembleBlock(parent.Hash(), &PayloadAttributesV1{
+			Timestamp: parent.Time() + 6,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create the executable data %v", err)
@@ -379,13 +374,12 @@ func TestFullAPI(t *testing.T) {
 		ethservice.TxPool().AddLocal(tx)
 
 		params := PayloadAttributesV1{
-			ParentHash:   parent.Hash(),
 			Timestamp:    parent.Time() + 1,
 			Random:       crypto.Keccak256Hash([]byte{byte(i)}),
 			FeeRecipient: parent.Coinbase(),
 		}
 		fcState := ForkchoiceStateV1{
-			HeadBlockHash:      params.ParentHash,
+			HeadBlockHash:      parent.Hash(),
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		}
@@ -396,7 +390,7 @@ func TestFullAPI(t *testing.T) {
 		if resp.Status != SUCCESS.Status {
 			t.Fatalf("error preparing payload, invalid status: %v", resp.Status)
 		}
-		payloadID := computePayloadId(params.ParentHash, &params)
+		payloadID := computePayloadId(parent.Hash(), &params)
 		payload, err := api.GetPayloadV1(hexutil.Bytes(payloadID))
 		if err != nil {
 			t.Fatalf("can't get payload: %v", err)
