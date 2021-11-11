@@ -473,15 +473,7 @@ func (api *ConsensusAPI) checkTerminalTotalDifficulty(head common.Hash) error {
 	if newHeadBlock == nil {
 		return &UnknownHeader
 	}
-	parent := api.eth.BlockChain().GetBlockByHash(newHeadBlock.ParentHash())
-	if parent == nil {
-		// Special case, the genesis block has no parent
-		if newHeadBlock.NumberU64() == 0 {
-			return nil
-		}
-		return fmt.Errorf("parent unavailable: %v", newHeadBlock.ParentHash())
-	}
-	td := api.eth.BlockChain().GetTd(parent.Hash(), parent.NumberU64())
+	td := api.eth.BlockChain().GetTd(newHeadBlock.Hash(), newHeadBlock.NumberU64())
 	if td != nil && td.Cmp(api.eth.BlockChain().Config().TerminalTotalDifficulty) < 0 {
 		return errors.New("total difficulty not reached yet")
 	}
