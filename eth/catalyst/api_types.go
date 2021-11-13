@@ -103,8 +103,8 @@ type ConsensusValidatedParams struct {
 }
 
 type ForkChoiceResponse struct {
-	Status    string        `json:"status"`
-	PayloadID hexutil.Bytes `json:"payloadId"`
+	Status    string         `json:"status"`
+	PayloadID *hexutil.Bytes `json:"payloadId"`
 }
 
 type ForkchoiceStateV1 struct {

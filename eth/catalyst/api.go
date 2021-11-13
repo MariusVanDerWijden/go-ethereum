@@ -216,7 +216,8 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads ForkchoiceStateV1, PayloadAtt
 			api.preparedBlocks[id] = data
 			log.Info("Created payload", "payloadid", id)
 			// TODO (MariusVanDerWijden) do something with the payloadID?
-			return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: hash}, nil
+			hex := hexutil.Bytes(hash)
+			return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: &hex}, nil
 		}
 	}
 	return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: nil}, nil

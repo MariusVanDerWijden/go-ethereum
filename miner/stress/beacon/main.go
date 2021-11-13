@@ -153,7 +153,7 @@ func (n *ethNode) assembleBlock(parentHash common.Hash, parentTimestamp uint64) 
 	if err != nil {
 		return nil, err
 	}
-	return n.api.GetPayloadV1(payload.PayloadID)
+	return n.api.GetPayloadV1(*payload.PayloadID)
 }
 
 func (n *ethNode) insertBlock(eb catalyst.ExecutableDataV1) error {
