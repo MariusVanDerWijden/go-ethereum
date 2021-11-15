@@ -235,9 +235,9 @@ func computePayloadId(headBlockHash common.Hash, params *PayloadAttributesV1) []
 
 func (api *ConsensusAPI) invalid() ExecutePayloadResponse {
 	if api.light {
-		return ExecutePayloadResponse{Status: VALID.Status, LatestValidHash: api.les.BlockChain().CurrentHeader().Hash()}
+		return ExecutePayloadResponse{Status: INVALID.Status, LatestValidHash: api.les.BlockChain().CurrentHeader().Hash()}
 	}
-	return ExecutePayloadResponse{Status: VALID.Status, LatestValidHash: api.eth.BlockChain().CurrentHeader().Hash()}
+	return ExecutePayloadResponse{Status: INVALID.Status, LatestValidHash: api.eth.BlockChain().CurrentHeader().Hash()}
 }
 
 // ExecutePayload creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
