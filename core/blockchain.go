@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
@@ -1358,6 +1359,37 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				prev.Hash().Bytes()[:4], i, block.NumberU64(), block.Hash().Bytes()[:4], block.ParentHash().Bytes()[:4])
 		}
 	}
+	if chain[len(chain)-1].Difficulty().Cmp(common.Big0) == 0 {
+		start := 0
+		for i := 0; i < len(chain); i++ {
+			if chain[i].Difficulty().Cmp(common.Big0) != 0 {
+				start++
+			}
+		}
+		// Pre-checks passed, start the full block imports
+		if !bc.chainmu.TryLock() {
+			return 0, errChainStopped
+		}
+		defer bc.chainmu.Unlock()
+		// Insert the pre-merge blocks
+		if start != 0 {
+			newChain := types.Blocks(chain[0:start])
+			if in, err := bc.insertChain(newChain, true, true); err != nil {
+				return in, err
+			}
+		}
+		// Insert the post-merge blocks
+		if start < len(chain) {
+			conf := bc.GetVMConfig()
+			conf.RandomOpcode = true
+			bc.SetVMConfig(*conf)
+			newChain := types.Blocks(chain[start:])
+			if _, err := bc.insertChain(newChain, true, true); err != nil {
+				return len(chain), err
+			}
+		}
+		return len(chain), nil
+	}
 	// Pre-checks passed, start the full block imports
 	if !bc.chainmu.TryLock() {
 		return 0, errChainStopped
@@ -1872,6 +1904,19 @@ func (bc *BlockChain) recoverAncestors(block *types.Block) error {
 		} else {
 			b = bc.GetBlock(hashes[i], numbers[i])
 		}
+		if b.Difficulty() != nil {
+			// Disable Random for pre-merge blocks
+			conf := bc.GetVMConfig()
+			conf.RandomOpcode = false
+			bc.SetVMConfig(*conf)
+			// Reenable Random afterwards
+			defer func() {
+				conf := bc.GetVMConfig()
+				conf.RandomOpcode = true
+				bc.SetVMConfig(*conf)
+			}()
+		}
+
 		if _, err := bc.insertChain(types.Blocks{b}, false, false); err != nil {
 			return err
 		}
@@ -2204,7 +2249,14 @@ func (bc *BlockChain) maintainTxIndex(ancients uint64) {
 		// If a previous indexing existed, make sure that we fill in any missing entries
 		if bc.txLookupLimit == 0 || head < bc.txLookupLimit {
 			if *tail > 0 {
-				rawdb.IndexTransactions(bc.db, 0, *tail, bc.quit)
+				// It can happen when chain is rewound to a historical point which
+				// is even lower than the indexes tail, recap the indexing target
+				// to new head to avoid reading non-existent block bodies.
+				end := *tail
+				if end > head+1 {
+					end = head + 1
+				}
+				rawdb.IndexTransactions(bc.db, 0, end, bc.quit)
 			}
 			return
 		}
@@ -2257,6 +2309,16 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, e
 		receiptString += fmt.Sprintf("\t %d: cumulative: %v gas: %v contract: %v status: %v tx: %v logs: %v bloom: %x state: %x\n",
 			i, receipt.CumulativeGasUsed, receipt.GasUsed, receipt.ContractAddress.Hex(),
 			receipt.Status, receipt.TxHash.Hex(), receipt.Logs, receipt.Bloom, receipt.PostState)
+	}
+	if eng, ok := bc.engine.(*beacon.Beacon); ok {
+		if eng.IsPoSHeader(block.Header()) {
+			fmt.Println("PoSHeader")
+		}
+		if reached, err := beacon.IsTTDReached(bc, block.ParentHash(), block.NumberU64()-1); reached {
+			fmt.Println("TTDD reached")
+		} else if err != nil {
+			fmt.Printf("TTDReached error: %v\n", err)
+		}
 	}
 	log.Error(fmt.Sprintf(`
 ########## BAD BLOCK #########

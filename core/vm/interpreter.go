@@ -28,8 +28,8 @@ import (
 type Config struct {
 	Debug                   bool      // Enables debugging
 	Tracer                  EVMLogger // Opcode logger
-	NoRecursion             bool      // Disables call, callcode, delegate call and create
 	NoBaseFee               bool      // Forces the EIP-1559 baseFee to 0 (needed for 0 price calls)
+	RandomOpcode            bool      // Enables the random opcode
 	EnablePreimageRecording bool      // Enables recording of SHA3/keccak preimages
 
 	JumpTable *JumpTable // EVM instruction table, automatically populated if unset
@@ -70,6 +70,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
+		case cfg.RandomOpcode:
+			cfg.JumpTable = &mergeInstructionSet
 		case evm.chainRules.IsLondon:
 			cfg.JumpTable = &londonInstructionSet
 		case evm.chainRules.IsBerlin:
