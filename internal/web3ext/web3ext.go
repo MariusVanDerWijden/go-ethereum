@@ -153,6 +153,11 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'newHead',
+			call: 'admin_newHead',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'sleepBlocks',
 			call: 'admin_sleepBlocks',
 			params: 2
@@ -575,6 +580,11 @@ web3._extend({
 			call: 'eth_feeHistory',
 			params: 3,
 			inputFormatter: [null, web3._extend.formatters.inputBlockNumberFormatter, null]
+		}),
+		new web3._extend.Method({
+			name: 'getLogs',
+			call: 'eth_getLogs',
+			params: 1,
 		}),
 	],
 	properties: [
