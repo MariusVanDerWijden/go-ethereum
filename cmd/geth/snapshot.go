@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"math/big"
 	"os"
 	"time"
 
@@ -176,6 +177,24 @@ as the backend data source, making this command a lot faster.
 The argument is interpreted as block number or hash. If none is provided, the latest
 block is used.
 `,
+			},
+			{
+				Name:      "calculateSupply",
+				Usage:     "Just run me",
+				ArgsUsage: "<root>",
+				Action:    utils.MigrateFlags(calculateSupply),
+				Category:  "MISCELLANEOUS COMMANDS",
+				Flags: []cli.Flag{
+					utils.DataDirFlag,
+					utils.AncientFlag,
+					utils.RopstenFlag,
+					utils.RinkebyFlag,
+					utils.GoerliFlag,
+				},
+				Description: `
+			This command iterates the snapshot and calculates the total amount of eth owned by all accounts.
+			This is one way to calculate the total supply.
+			There are other techniques which might result in different results, like tracing all transactions from genesis`,
 			},
 		},
 	}
@@ -527,5 +546,64 @@ func dumpState(ctx *cli.Context) error {
 	}
 	log.Info("Snapshot dumping complete", "accounts", accounts,
 		"elapsed", common.PrettyDuration(time.Since(start)))
+	return nil
+}
+
+func calculateSupply(ctx *cli.Context) error {
+
+	stack, _ := makeConfigNode(ctx)
+	defer stack.Close()
+
+	chaindb := utils.MakeChainDatabase(ctx, stack, true)
+	headBlock := rawdb.ReadHeadBlock(chaindb)
+	if headBlock == nil {
+		log.Error("Failed to load head block")
+		return errors.New("no head block")
+	}
+	snaptree, err := snapshot.New(chaindb, trie.NewDatabase(chaindb), 256, headBlock.Root(), false, false, false)
+	log.Info("Calculating total supply", "block", headBlock.NumberU64())
+	if err != nil {
+		log.Error("Failed to open snapshot tree", "error", err)
+		return err
+	}
+	if ctx.NArg() > 1 {
+		log.Error("Too many arguments given")
+		return errors.New("too many arguments")
+	}
+	var root = headBlock.Root()
+	if ctx.NArg() == 1 {
+		root, err = parseRoot(ctx.Args()[0])
+		if err != nil {
+			log.Error("Failed to resolve state root", "error", err)
+			return err
+		}
+	}
+
+	var (
+		allAccounts int
+		lastReport  time.Time
+		start       = time.Now()
+		totalSupply *big.Int
+	)
+	accIter, _ := snaptree.AccountIterator(root, common.Hash{})
+	for accIter.Next() {
+		allAccounts += 1
+		acc, err := snapshot.FullAccount(accIter.Account())
+		if err != nil {
+			log.Error("Invalid account encountered during traversal", "error", err)
+			return err
+		}
+		totalSupply.Add(totalSupply, acc.Balance)
+
+		if time.Since(lastReport) > time.Second*8 {
+			log.Info("Traversing state", "accounts", allAccounts, "elapsed", common.PrettyDuration(time.Since(start)))
+			lastReport = time.Now()
+		}
+	}
+	if accIter.Error() != nil {
+		log.Error("Failed to traverse state trie", "root", root, "error", accIter.Error())
+		return accIter.Error()
+	}
+	log.Info("State is complete", "accounts", allAccounts, "elapsed", common.PrettyDuration(time.Since(start)), "totalSupply (in Wei)", totalSupply)
 	return nil
 }
