@@ -110,37 +110,40 @@ func NewFilter(chain Blockchain) Filter {
 	return newFilter(
 		chain.Config(),
 		chain.Genesis().Hash(),
-		func() uint64 {
-			return chain.CurrentHeader().Number.Uint64()
+		func() (uint64, uint64) {
+			return chain.CurrentHeader().Number.Uint64(), chain.CurrentHeader().Time
 		},
 	)
 }
 
 // NewStaticFilter creates a filter at block zero.
 func NewStaticFilter(config *params.ChainConfig, genesis common.Hash) Filter {
-	head := func() uint64 { return 0 }
+	head := func() (uint64, uint64) { return 0, 0 }
 	return newFilter(config, genesis, head)
 }
 
 // newFilter is the internal version of NewFilter, taking closures as its arguments
 // instead of a chain. The reason is to allow testing it without having to simulate
 // an entire blockchain.
-func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() uint64) Filter {
+func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() (uint64, uint64)) Filter {
 	// Calculate the all the valid fork hash and fork next combos
 	var (
 		forks, forksByTime = gatherForks(config)
 		sums               = make([][4]byte, len(forks)+len(forksByTime)+1) // 0th is the genesis
 	)
-	forks = append(forks, forksByTime...)
+	allForks := append(forks, forksByTime...)
 	hash := crc32.ChecksumIEEE(genesis[:])
 	sums[0] = checksumToBytes(hash)
-	for i, fork := range forks {
+	for i, fork := range allForks {
 		hash = checksumUpdate(hash, fork)
 		sums[i+1] = checksumToBytes(hash)
 	}
 	// Add two sentries to simplify the fork checks and don't require special
 	// casing the last one.
-	forks = append(forks, math.MaxUint64) // Last fork will never be passed
+	if len(forksByTime) == 0 {
+		forks = append(forks, math.MaxUint64)
+	}
+	forksByTime = append(forksByTime, math.MaxUint64) // Last fork will never be passed
 
 	// Create a validator that will filter out incompatible chains
 	return func(id ID) error {
@@ -163,19 +166,14 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() ui
 		//        the remote, but at this current point in time we don't have enough
 		//        information.
 		//   4. Reject in all other cases.
-		head := headfn()
-		for i, fork := range forks {
-			// If our head is beyond this fork, continue to the next (we have a dummy
-			// fork of maxuint64 as the last item to always fail this check eventually).
-			if head >= fork {
-				continue
-			}
+
+		verify := func(index int, headOrTime uint64) error {
 			// Found the first unpassed fork block, check if our current state matches
 			// the remote checksum (rule #1).
-			if sums[i] == id.Hash {
+			if sums[index] == id.Hash {
 				// Fork checksum matched, check if a remote future fork block already passed
 				// locally without the local node being aware of it (rule #1a).
-				if id.Next > 0 && head >= id.Next {
+				if id.Next > 0 && headOrTime >= id.Next {
 					return ErrLocalIncompatibleOrStale
 				}
 				// Haven't passed locally a remote-only fork, accept the connection (rule #1b).
@@ -183,10 +181,10 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() ui
 			}
 			// The local and remote nodes are in different forks currently, check if the
 			// remote checksum is a subset of our local forks (rule #2).
-			for j := 0; j < i; j++ {
+			for j := 0; j < index; j++ {
 				if sums[j] == id.Hash {
 					// Remote checksum is a subset, validate based on the announced next fork
-					if forks[j] != id.Next {
+					if allForks[j] != id.Next {
 						return ErrRemoteStale
 					}
 					return nil
@@ -194,7 +192,7 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() ui
 			}
 			// Remote chain is not a subset of our local one, check if it's a superset by
 			// any chance, signalling that we're simply out of sync (rule #3).
-			for j := i + 1; j < len(sums); j++ {
+			for j := index + 1; j < len(sums); j++ {
 				if sums[j] == id.Hash {
 					// Yay, remote checksum is a superset, ignore upcoming forks
 					return nil
@@ -203,6 +201,27 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() ui
 			// No exact, subset or superset match. We are on differing chains, reject.
 			return ErrLocalIncompatibleOrStale
 		}
+
+		head, time := headfn()
+		// Verify forks by block
+		for i, fork := range forks {
+			// If our head is beyond this fork, continue to the next (we have a dummy
+			// fork of maxuint64 as the last item to always fail this check eventually).
+			if head >= fork {
+				continue
+			}
+			return verify(i, head)
+		}
+		// Verify forks by time
+		for i, fork := range forksByTime {
+			// If our head is beyond this fork, continue to the next (we have a dummy
+			// fork of maxuint64 as the last item to always fail this check eventually).
+			if time >= fork {
+				continue
+			}
+			return verify(len(forks)+i, time)
+		}
+
 		log.Error("Impossible fork ID validation", "id", id)
 		return nil // Something's very wrong, accept rather than reject
 	}

@@ -365,7 +365,93 @@ func TestValidation(t *testing.T) {
 		{7279999, ID{Hash: checksumToBytes(0xa00bc324), Next: 7279999}, ErrLocalIncompatibleOrStale},
 	}
 	for i, tt := range tests {
-		filter := newFilter(params.MainnetChainConfig, params.MainnetGenesisHash, func() uint64 { return tt.head })
+		filter := newFilter(params.MainnetChainConfig, params.MainnetGenesisHash, func() (uint64, uint64) { return tt.head, 0 })
+		if err := filter(tt.id); err != tt.err {
+			t.Errorf("test %d: validation error mismatch: have %v, want %v", i, err, tt.err)
+		}
+	}
+}
+
+// TestValidationByTimestamp tests that a local peer correctly validates and accepts a remote
+// fork ID.
+func TestValidationByTimestamp(t *testing.T) {
+	withdrawalConfig := *params.MainnetChainConfig
+	withdrawalConfig.MergeNetsplitBlock = big.NewInt(18000000)
+	withdrawalConfig.ShanghaiTime = big.NewInt(1668000000)
+	tests := []struct {
+		head uint64
+		time uint64
+		id   ID
+		err  error
+	}{
+		// Local is mainnet Withdrawals, remote announces the same. No future fork is announced.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xc1fdf181), Next: 0}, nil},
+
+		// Local is mainnet Withdrawals, remote announces the same also announces a next fork
+		// at block/time 0xffffffff, but that is uncertain.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xc1fdf181), Next: math.MaxUint64}, nil},
+
+		// Local is mainnet currently in Byzantium only (so it's aware of Petersburg & Withdrawals), remote announces
+		// also Byzantium, but it's not yet aware of Petersburg (e.g. non updated node before the fork).
+		// In this case we don't know if Petersburg passed yet or not.
+		{7279999, 1667999999, ID{Hash: checksumToBytes(0xa00bc324), Next: 0}, nil},
+
+		// Local is mainnet currently in Byzantium only (so it's aware of Petersburg & Withdrawals), remote announces
+		// also Byzantium, and it's also aware of Petersburg (e.g. updated node before the fork). We
+		// don't know if Petersburg passed yet (will pass) or not.
+		{7279999, 1667999999, ID{Hash: checksumToBytes(0xa00bc324), Next: 7280000}, nil},
+
+		// Local is mainnet currently in Byzantium only (so it's aware of Petersburg & Withdrawals), remote announces
+		// also Byzantium, and it's also aware of some random fork (e.g. misconfigured Petersburg). As
+		// neither forks passed at neither nodes, they may mismatch, but we still connect for now.
+		{7279999, 1667999999, ID{Hash: checksumToBytes(0xa00bc324), Next: math.MaxUint64}, nil},
+
+		// Local is mainnet exactly on Withdrawals, remote announces Byzantium + knowledge about Petersburg. Remote
+		// is simply out of sync, accept.
+		{20000000, 1668000000, ID{Hash: checksumToBytes(0xa00bc324), Next: 7280000}, nil},
+
+		// Local is mainnet Withdrawals, remote announces Byzantium + knowledge about Petersburg. Remote
+		// is simply out of sync, accept.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xa00bc324), Next: 7280000}, nil},
+
+		// Local is mainnet Withdrawals, remote announces Spurious + knowledge about Byzantium. Remote
+		// is definitely out of sync. It may or may not need the Petersburg update, we don't know yet.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0x3edd5b10), Next: 4370000}, nil},
+
+		// Local is mainnet Byzantium & pre-withdrawals, remote announces Petersburg. Local is out of sync, accept.
+		{7279999, 1667999999, ID{Hash: checksumToBytes(0x668db0af), Next: 0}, nil},
+
+		// Local is mainnet Spurious, remote announces Byzantium, but is not aware of Petersburg. Local
+		// out of sync. Local also knows about a future fork, but that is uncertain yet.
+		{4369999, 1667999999, ID{Hash: checksumToBytes(0xa00bc324), Next: 0}, nil},
+
+		// Local is mainnet Withdrawals. remote announces Byzantium but is not aware of further forks.
+		// Remote needs software update.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xa00bc324), Next: 0}, ErrRemoteStale},
+
+		// Local is mainnet Withdrawals, and isn't aware of more forks. Remote announces Petersburg +
+		// 0xffffffff. Local needs software update, reject.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0x5cddc0e1), Next: 0}, ErrLocalIncompatibleOrStale},
+
+		// Local is mainnet Withdrawals, and is aware of Petersburg. Remote announces Petersburg +
+		// 0xffffffff. Local needs software update, reject.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0x5cddc0e1), Next: 0}, ErrLocalIncompatibleOrStale},
+
+		// Local is mainnet Withdrawals, remote is Rinkeby Petersburg.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xafec6b27), Next: 0}, ErrLocalIncompatibleOrStale},
+
+		// Local is mainnet Withdrawals, far in the future. Remote announces Gopherium (non existing fork)
+		// at some future block 88888888, for itself, but past block for local. Local is incompatible.
+		//
+		// This case detects non-upgraded nodes with majority hash power (typical Ropsten mess).
+		{88888888, 1668000001, ID{Hash: checksumToBytes(0xf0afd0e3), Next: 88888888}, ErrRemoteStale},
+
+		// Local is mainnet Withdrawals. Remote is in Byzantium, but announces Gopherium (non existing
+		// fork) at block 7279999, before Petersburg. Local is incompatible.
+		{20000000, 1668000001, ID{Hash: checksumToBytes(0xa00bc324), Next: 7279999}, ErrRemoteStale},
+	}
+	for i, tt := range tests {
+		filter := newFilter(&withdrawalConfig, params.MainnetGenesisHash, func() (uint64, uint64) { return tt.head, tt.time })
 		if err := filter(tt.id); err != tt.err {
 			t.Errorf("test %d: validation error mismatch: have %v, want %v", i, err, tt.err)
 		}
