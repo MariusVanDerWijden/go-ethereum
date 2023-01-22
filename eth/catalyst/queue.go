@@ -73,13 +73,13 @@ func (q *payloadQueue) put(id engine.PayloadID, payload *miner.Payload) {
 }
 
 // get retrieves a previously stored payload item or nil if it does not exist.
-func (q *payloadQueue) get(id engine.PayloadID, full bool) *engine.ExecutionPayloadEnvelope {
+func (q *payloadQueue) get(id engine.PayloadID, full bool) (*engine.ExecutionPayloadEnvelope, *common.Hash) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
 	for _, item := range q.payloads {
 		if item == nil {
-			return nil // no more items
+			return nil, nil // no more items
 		}
 		if item.id == id {
 			if !full {
@@ -88,7 +88,7 @@ func (q *payloadQueue) get(id engine.PayloadID, full bool) *engine.ExecutionPayl
 			return item.payload.ResolveFull()
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // has checks if a particular payload is already tracked.

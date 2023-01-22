@@ -293,7 +293,7 @@ func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, b
 
 // BlockToExecutableData constructs the ExecutableData structure by filling the
 // fields from the given block. It assumes the given block is post-merge block.
-func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.BlobTxSidecar) *ExecutionPayloadEnvelope {
+func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.BlobTxSidecar) (*ExecutionPayloadEnvelope, *common.Hash) {
 	data := &ExecutableData{
 		BlockHash:        block.Hash(),
 		ParentHash:       block.ParentHash(),
@@ -327,7 +327,7 @@ func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.
 		}
 	}
 	setRequests(block.Requests(), data)
-	return &ExecutionPayloadEnvelope{ExecutionPayload: data, BlockValue: fees, BlobsBundle: &bundle, Override: false}
+	return &ExecutionPayloadEnvelope{ExecutionPayload: data, BlockValue: fees, BlobsBundle: &bundle, Override: false}, block.BeaconRoot()
 }
 
 // setRequests differentiates the different request types and
