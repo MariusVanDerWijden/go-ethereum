@@ -938,7 +938,8 @@ func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error preparing payload, err=%v", err)
 	}
-	data := *payload.Resolve().ExecutionPayload
+	pl, _ := payload.Resolve()
+	data := pl.ExecutionPayload
 	// We need to recompute the blockhash, since the miner computes a wrong (correct) blockhash
 	txs, _ := decodeTransactions(data.Transactions)
 	header := &types.Header{
@@ -961,7 +962,7 @@ func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
 	block := types.NewBlockWithHeader(header).WithBody(types.Body{Transactions: txs})
 	data.BlockHash = block.Hash()
 	// Send the new payload
-	resp2, err := api.NewPayloadV1(data)
+	resp2, err := api.NewPayloadV1(*data)
 	if err != nil {
 		t.Fatalf("error sending NewPayload, err=%v", err)
 	}
