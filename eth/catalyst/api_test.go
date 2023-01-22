@@ -678,7 +678,8 @@ func assembleBlock(api *ConsensusAPI, parentHash common.Hash, params *engine.Pay
 	if err != nil {
 		return nil, err
 	}
-	return payload.ResolveFull().ExecutionPayload, nil
+	pl, _ := payload.ResolveFull()
+	return pl.ExecutionPayload, nil
 }
 
 func TestEmptyBlocks(t *testing.T) {
@@ -915,7 +916,8 @@ func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error preparing payload, err=%v", err)
 	}
-	data := *payload.Resolve().ExecutionPayload
+	pl, _ := payload.Resolve()
+	data := pl.ExecutionPayload
 	// We need to recompute the blockhash, since the miner computes a wrong (correct) blockhash
 	txs, _ := decodeTransactions(data.Transactions)
 	header := &types.Header{
@@ -938,7 +940,7 @@ func TestNewPayloadOnInvalidTerminalBlock(t *testing.T) {
 	block := types.NewBlockWithHeader(header).WithBody(types.Body{Transactions: txs})
 	data.BlockHash = block.Hash()
 	// Send the new payload
-	resp2, err := api.NewPayloadV1(data)
+	resp2, err := api.NewPayloadV1(*data)
 	if err != nil {
 		t.Fatalf("error sending NewPayload, err=%v", err)
 	}
@@ -1555,7 +1557,7 @@ func TestBlockToPayloadWithBlobs(t *testing.T) {
 	}
 
 	block := types.NewBlock(&header, &types.Body{Transactions: txs}, nil, trie.NewStackTrie(nil))
-	envelope := engine.BlockToExecutableData(block, nil, sidecars)
+	envelope, _ := engine.BlockToExecutableData(block, nil, sidecars)
 	var want int
 	for _, tx := range txs {
 		want += len(tx.BlobHashes())

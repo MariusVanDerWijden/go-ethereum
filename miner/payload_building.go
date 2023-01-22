@@ -125,7 +125,7 @@ func (payload *Payload) update(r *newPayloadResult, elapsed time.Duration) {
 
 // Resolve returns the latest built payload and also terminates the background
 // thread for updating payload. It's safe to be called multiple times.
-func (payload *Payload) Resolve() *engine.ExecutionPayloadEnvelope {
+func (payload *Payload) Resolve() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
@@ -142,7 +142,7 @@ func (payload *Payload) Resolve() *engine.ExecutionPayloadEnvelope {
 
 // ResolveEmpty is basically identical to Resolve, but it expects empty block only.
 // It's only used in tests.
-func (payload *Payload) ResolveEmpty() *engine.ExecutionPayloadEnvelope {
+func (payload *Payload) ResolveEmpty() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
@@ -151,14 +151,14 @@ func (payload *Payload) ResolveEmpty() *engine.ExecutionPayloadEnvelope {
 
 // ResolveFull is basically identical to Resolve, but it expects full block only.
 // Don't call Resolve until ResolveFull returns, otherwise it might block forever.
-func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
+func (payload *Payload) ResolveFull() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
 	if payload.full == nil {
 		select {
 		case <-payload.stop:
-			return nil
+			return nil, nil
 		default:
 		}
 		// Wait the full payload construction. Note it might block
