@@ -81,6 +81,7 @@ type Payload struct {
 	stop          chan struct{}
 	lock          sync.Mutex
 	cond          *sync.Cond
+	BeaconRoot    *common.Hash
 }
 
 // newPayload initializes the payload object.
@@ -226,6 +227,7 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 	}
 	// Construct a payload object for return.
 	payload := newPayload(empty.block, empty.requests, empty.witness, args.Id())
+	payload.BeaconRoot = args.BeaconRoot
 
 	// Spin up a routine for updating the payload in background. This strategy
 	// can maximum the revenue for including transactions with highest fee.
