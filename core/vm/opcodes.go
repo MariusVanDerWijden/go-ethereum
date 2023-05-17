@@ -100,6 +100,7 @@ const (
 	CHAINID     OpCode = 0x46
 	SELFBALANCE OpCode = 0x47
 	BASEFEE     OpCode = 0x48
+	BEACONROOT  OpCode = 0x4A
 )
 
 // 0x50 range - 'storage' and execution.
