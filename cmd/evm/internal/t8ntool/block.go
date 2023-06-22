@@ -54,16 +54,20 @@ type header struct {
 	Nonce           *types.BlockNonce `json:"nonce"`
 	BaseFee         *big.Int          `json:"baseFeePerGas" rlp:"optional"`
 	WithdrawalsHash *common.Hash      `json:"withdrawalsRoot" rlp:"optional"`
+	DataGasUsed     *uint64           `json:"dataGasUsed"   rlp:"optional"`
+	ExcessDataGas   *uint64           `json:"excessDataGas"   rlp:"optional"`
 }
 
 type headerMarshaling struct {
-	Difficulty *math.HexOrDecimal256
-	Number     *math.HexOrDecimal256
-	GasLimit   math.HexOrDecimal64
-	GasUsed    math.HexOrDecimal64
-	Time       math.HexOrDecimal64
-	Extra      hexutil.Bytes
-	BaseFee    *math.HexOrDecimal256
+	Difficulty    *math.HexOrDecimal256
+	Number        *math.HexOrDecimal256
+	GasLimit      math.HexOrDecimal64
+	GasUsed       math.HexOrDecimal64
+	Time          math.HexOrDecimal64
+	Extra         hexutil.Bytes
+	BaseFee       *math.HexOrDecimal256
+	DataGasUsed   *math.HexOrDecimal64
+	ExcessDataGas *math.HexOrDecimal64
 }
 
 type bbInput struct {
@@ -129,6 +133,8 @@ func (i *bbInput) ToBlock() *types.Block {
 		MixDigest:       i.Header.MixDigest,
 		BaseFee:         i.Header.BaseFee,
 		WithdrawalsHash: i.Header.WithdrawalsHash,
+		DataGasUsed:     i.Header.DataGasUsed,
+		ExcessDataGas:   i.Header.ExcessDataGas,
 	}
 
 	// Fill optional values.

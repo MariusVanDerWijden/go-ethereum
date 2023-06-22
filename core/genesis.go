@@ -63,6 +63,7 @@ type Genesis struct {
 	GasUsed       uint64      `json:"gasUsed"`
 	ParentHash    common.Hash `json:"parentHash"`
 	BaseFee       *big.Int    `json:"baseFeePerGas"`
+	DataGasUsed   *uint64     `json:"dataGasUsed"`
 	ExcessDataGas *uint64     `json:"excessDataGas"`
 }
 
@@ -215,15 +216,17 @@ type GenesisAccount struct {
 
 // field type overrides for gencodec
 type genesisSpecMarshaling struct {
-	Nonce      math.HexOrDecimal64
-	Timestamp  math.HexOrDecimal64
-	ExtraData  hexutil.Bytes
-	GasLimit   math.HexOrDecimal64
-	GasUsed    math.HexOrDecimal64
-	Number     math.HexOrDecimal64
-	Difficulty *math.HexOrDecimal256
-	BaseFee    *math.HexOrDecimal256
-	Alloc      map[common.UnprefixedAddress]GenesisAccount
+	Nonce         math.HexOrDecimal64
+	Timestamp     math.HexOrDecimal64
+	ExtraData     hexutil.Bytes
+	GasLimit      math.HexOrDecimal64
+	GasUsed       math.HexOrDecimal64
+	Number        math.HexOrDecimal64
+	Difficulty    *math.HexOrDecimal256
+	BaseFee       *math.HexOrDecimal256
+	DataGasUsed   *math.HexOrDecimal64
+	ExcessDataGas *math.HexOrDecimal64
+	Alloc         map[common.UnprefixedAddress]GenesisAccount
 }
 
 type genesisAccountMarshaling struct {
@@ -465,6 +468,12 @@ func (g *Genesis) ToBlock() *types.Block {
 		withdrawals = make([]*types.Withdrawal, 0)
 	}
 	if g.Config != nil && g.Config.IsCancun(big.NewInt(int64(g.Number)), g.Timestamp) {
+		if g.DataGasUsed == nil {
+			var dataGasUsed uint64
+			head.DataGasUsed = &dataGasUsed
+		} else {
+			head.DataGasUsed = g.DataGasUsed
+		}
 		if g.ExcessDataGas == nil {
 			var excessDataGas uint64
 			head.ExcessDataGas = &excessDataGas

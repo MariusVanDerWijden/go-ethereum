@@ -62,7 +62,9 @@ type Receipt struct {
 	TxHash            common.Hash    `json:"transactionHash" gencodec:"required"`
 	ContractAddress   common.Address `json:"contractAddress"`
 	GasUsed           uint64         `json:"gasUsed" gencodec:"required"`
+	DataGasUsed       *uint64        `json:"dataGasUsed"`
 	EffectiveGasPrice *big.Int       `json:"effectiveGasPrice"` // required, but tag omitted for backwards compatibility
+	DataGasPrice      *uint64        `json:"dataGasPrice"`
 
 	// Inclusion information: These fields provide information about the inclusion of the
 	// transaction corresponding to this receipt.
@@ -77,7 +79,9 @@ type receiptMarshaling struct {
 	Status            hexutil.Uint64
 	CumulativeGasUsed hexutil.Uint64
 	GasUsed           hexutil.Uint64
+	DataGasUsed       *hexutil.Uint64
 	EffectiveGasPrice *hexutil.Big
+	DataGasPrice      *hexutil.Uint64
 	BlockNumber       *hexutil.Big
 	TransactionIndex  hexutil.Uint
 }
@@ -340,6 +344,9 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 		} else {
 			rs[i].ContractAddress = common.Address{}
 		}
+
+		dataGasUsed := uint64(len(txs[i].BlobHashes()) * params.BlobTxDataGasPerBlob)
+		rs[i].DataGasUsed = &dataGasUsed
 
 		// The used gas can be calculated based on previous r
 		if i == 0 {
