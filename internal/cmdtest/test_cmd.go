@@ -31,8 +31,6 @@ import (
 	"testing"
 	"text/template"
 	"time"
-
-	"github.com/docker/docker/pkg/reexec"
 )
 
 func NewTestCmd(t *testing.T, data interface{}) *TestCmd {
@@ -62,8 +60,12 @@ var id atomic.Int32
 func (tt *TestCmd) Run(name string, args ...string) {
 	id.Add(1)
 	tt.stderr = &testlogger{t: tt.T, name: fmt.Sprintf("%d", id.Load())}
+	path, err := os.Executable()
+	if err != nil {
+		tt.Fatal(err)
+	}
 	tt.cmd = &exec.Cmd{
-		Path:   reexec.Self(),
+		Path:   path,
 		Args:   append([]string{name}, args...),
 		Stderr: tt.stderr,
 	}

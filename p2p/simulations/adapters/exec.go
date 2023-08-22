@@ -272,8 +272,12 @@ func (n *ExecNode) waitForStartupJSON(ctx context.Context) (string, chan nodeSta
 // the current binary but setting argv[0] to "p2p-node" so that the child
 // runs execP2PNode
 func (n *ExecNode) execCommand() *exec.Cmd {
+	name, err := os.Executable()
+	if err != nil {
+		name = ""
+	}
 	return &exec.Cmd{
-		Path: reexec.Self(),
+		Path: name,
 		Args: []string{"p2p-node", strings.Join(n.Config.Node.Lifecycles, ","), n.ID.String()},
 	}
 }
