@@ -35,11 +35,12 @@ import (
 // Check engine-api specification for more details.
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md#payloadattributesv1
 type BuildPayloadArgs struct {
-	Parent       common.Hash       // The parent block to build payload on top
-	Timestamp    uint64            // The provided timestamp of generated payload
-	FeeRecipient common.Address    // The provided recipient address for collecting transaction fee
-	Random       common.Hash       // The provided randomness value
-	Withdrawals  types.Withdrawals // The provided withdrawals
+	Parent       common.Hash          // The parent block to build payload on top
+	Timestamp    uint64               // The provided timestamp of generated payload
+	FeeRecipient common.Address       // The provided recipient address for collecting transaction fee
+	Random       common.Hash          // The provided randomness value
+	Withdrawals  types.Withdrawals    // The provided withdrawals
+	Transactions []*types.Transaction // Mandatory transactions to be included
 }
 
 // Id computes an 8-byte identifier by hashing the components of the payload arguments.
@@ -51,6 +52,7 @@ func (args *BuildPayloadArgs) Id() engine.PayloadID {
 	hasher.Write(args.Random[:])
 	hasher.Write(args.FeeRecipient[:])
 	rlp.Encode(hasher, args.Withdrawals)
+	rlp.Encode(hasher, args.Transactions)
 	var out engine.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
 	return out
@@ -165,7 +167,16 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 	// Build the initial version with no transaction included. It should be fast
 	// enough to run. The empty payload can at least make sure there is something
 	// to deliver for not missing slot.
-	empty, _, err := w.getSealingBlock(args.Parent, args.Timestamp, args.FeeRecipient, args.Random, args.Withdrawals, true)
+	emptyParams := &generateParams{
+		timestamp:   args.Timestamp,
+		forceTime:   true,
+		parentHash:  args.Parent,
+		coinbase:    args.FeeRecipient,
+		random:      args.Random,
+		withdrawals: args.Withdrawals,
+		noTxs:       true,
+	}
+	empty, _, err := w.getSealingBlock(emptyParams)
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +196,21 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		// by the timestamp parameter.
 		endTimer := time.NewTimer(time.Second * 12)
 
+		fullParams := &generateParams{
+			timestamp:   args.Timestamp,
+			forceTime:   true,
+			parentHash:  args.Parent,
+			coinbase:    args.FeeRecipient,
+			random:      args.Random,
+			withdrawals: args.Withdrawals,
+			noTxs:       false,
+		}
+
 		for {
 			select {
 			case <-timer.C:
 				start := time.Now()
-				block, fees, err := w.getSealingBlock(args.Parent, args.Timestamp, args.FeeRecipient, args.Random, args.Withdrawals, false)
+				block, fees, err := w.getSealingBlock(fullParams)
 				if err == nil {
 					payload.update(block, fees, time.Since(start))
 				}
