@@ -36,11 +36,13 @@ type PayloadAttributes struct {
 	Random                common.Hash         `json:"prevRandao"            gencodec:"required"`
 	SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
+	Transactions          [][]byte            `json:"transactions"`
 }
 
 // JSON type overrides for PayloadAttributes.
 type payloadAttributesMarshaling struct {
-	Timestamp hexutil.Uint64
+	Timestamp    hexutil.Uint64
+	Transactions []hexutil.Bytes
 }
 
 //go:generate go run github.com/fjl/gencodec -type ExecutableData -field-override executableDataMarshaling -out gen_ed.go
@@ -149,7 +151,7 @@ func encodeTransactions(txs []*types.Transaction) [][]byte {
 	return enc
 }
 
-func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
+func DecodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
 	var txs = make([]*types.Transaction, len(enc))
 	for i, encTx := range enc {
 		var tx types.Transaction
@@ -173,7 +175,7 @@ func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
 // Withdrawals value will propagate through the returned block. Empty
 // Withdrawals value must be passed via non-nil, length 0 value in params.
 func ExecutableDataToBlock(params ExecutableData, versionedHashes []common.Hash) (*types.Block, error) {
-	txs, err := decodeTransactions(params.Transactions)
+	txs, err := DecodeTransactions(params.Transactions)
 	if err != nil {
 		return nil, err
 	}

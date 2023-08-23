@@ -197,13 +197,14 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		endTimer := time.NewTimer(time.Second * 12)
 
 		fullParams := &generateParams{
-			timestamp:   args.Timestamp,
-			forceTime:   true,
-			parentHash:  args.Parent,
-			coinbase:    args.FeeRecipient,
-			random:      args.Random,
-			withdrawals: args.Withdrawals,
-			noTxs:       false,
+			timestamp:    args.Timestamp,
+			forceTime:    true,
+			parentHash:   args.Parent,
+			coinbase:     args.FeeRecipient,
+			random:       args.Random,
+			withdrawals:  args.Withdrawals,
+			noTxs:        false,
+			transactions: args.Transactions,
 		}
 
 		for {

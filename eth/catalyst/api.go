@@ -339,12 +339,18 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 	// sealed by the beacon client. The payload will be requested later, and we
 	// will replace it arbitrarily many times in between.
 	if payloadAttributes != nil {
+		transactions, err := engine.DecodeTransactions(payloadAttributes.Transactions)
+		if err != nil {
+			log.Warn("Invalid transactions", "error", err)
+			return engine.STATUS_INVALID, err
+		}
 		args := &miner.BuildPayloadArgs{
 			Parent:       update.HeadBlockHash,
 			Timestamp:    payloadAttributes.Timestamp,
 			FeeRecipient: payloadAttributes.SuggestedFeeRecipient,
 			Random:       payloadAttributes.Random,
 			Withdrawals:  payloadAttributes.Withdrawals,
+			Transactions: transactions,
 		}
 		id := args.Id()
 		// If we already are busy generating this work, then we do not need
@@ -395,7 +401,7 @@ func (api *ConsensusAPI) ExchangeTransitionConfigurationV1(config engine.Transit
 
 // GetPayloadV1 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV1(payloadID engine.PayloadID) (*engine.ExecutableData, error) {
-	data, err := api.getPayload(payloadID, false)
+	data, err := api.getPayload(payloadID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,17 +410,17 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID engine.PayloadID) (*engine.Execu
 
 // GetPayloadV2 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV2(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
-	return api.getPayload(payloadID, false)
+	return api.getPayload(payloadID)
 }
 
 // GetPayloadV3 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV3(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
-	return api.getPayload(payloadID, false)
+	return api.getPayload(payloadID)
 }
 
-func (api *ConsensusAPI) getPayload(payloadID engine.PayloadID, full bool) (*engine.ExecutionPayloadEnvelope, error) {
+func (api *ConsensusAPI) getPayload(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
 	log.Trace("Engine API request received", "method", "GetPayload", "id", payloadID)
-	data := api.localBlocks.get(payloadID, full)
+	data := api.localBlocks.get(payloadID, true)
 	if data == nil {
 		return nil, engine.UnknownPayload
 	}
@@ -451,7 +457,7 @@ func (api *ConsensusAPI) NewPayloadV3(params engine.ExecutableData, versionedHas
 	}
 
 	if params.ExcessBlobGas == nil {
-		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(errors.New("nil excessBlobGas post-cancun"))
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(fmt.Errorf("nil excessDataGas post-cancun"))
 	}
 	var hashes []common.Hash
 	if versionedHashes != nil {
