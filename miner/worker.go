@@ -920,13 +920,33 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment, inc
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
 
-	// TODO: create tx heap, commit transactions, remove txs from local & pending
+	// Set up inclusionTx heap
+	inclusionTxs := make(map[common.Address][]*txpool.LazyTransaction)
 	for _, tx := range inclusionList {
-		w.commitTransaction(env, tx)
+		signer, err := w.current.signer.Sender(tx)
+		if err != nil {
+			return err
+		}
+		inclusionTxs[signer] = append(inclusionTxs[signer], &txpool.LazyTransaction{Tx: tx})
+	}
+	// Commit all inclusion list transactions
+	if len(inclusionTxs) > 0 {
+		txs := newTransactionsByPriceAndNonce(env.signer, inclusionTxs, env.header.BaseFee)
+		if err := w.commitTransactions(env, txs, interrupt); err != nil {
+			return err
+		}
+	}
+	// Remove inclusionList accounts from pending
+	for account, _ := range inclusionTxs {
+		delete(pending, account)
 	}
 
 	localTxs, remoteTxs := make(map[common.Address][]*txpool.LazyTransaction), pending
 	for _, account := range w.eth.TxPool().Locals() {
+		if _, ok := inclusionTxs[account]; ok {
+			// Remove inclusionList accounts from locals
+			continue
+		}
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
 			localTxs[account] = txs
