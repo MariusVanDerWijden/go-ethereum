@@ -196,4 +196,7 @@ var (
 	SystemAddress = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
 	// HistoryStorageAddress is where the historical block hashes are stored.
 	HistoryStorageAddress = common.HexToAddress("0x25a219378dad9b3503c8268c9ca836a52427a4fb")
+
+	// Magic prefix for EIP-3074 AUTH messages.
+	AuthMagic = byte(0x04)
 )
