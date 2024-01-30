@@ -254,7 +254,7 @@ func TestG1MapToCurve(t *testing.T) {
 			t.Fatal("map to curve fails", i, err)
 		}
 		if !bytes.Equal(g.ToBytes(p0), v.expected) {
-			t.Fatal("map to curve fails", i)
+			t.Fatalf("map to curve fails %v, want %v got %v", i, v.expected, g.ToBytes(p0))
 		}
 	}
 }
