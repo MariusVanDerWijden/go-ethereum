@@ -432,3 +432,17 @@ func (g *G1) MapToCurve(in []byte) (*PointG1, error) {
 	g.ClearCofactor(p)
 	return g.Affine(p), nil
 }
+
+// Implements https://eprint.iacr.org/2022/759.pdf
+func (g *G1) MapToCurveSwiftEC(in []byte) (*PointG1, error) {
+	u, err := fromBytes(in)
+	if err != nil {
+		return nil, err
+	}
+	x, y := ecMapG1(u)
+	isogenyMapG1(x, y)
+	one := new(fe).one()
+	p := &PointG1{*x, *y, *one}
+	g.ClearCofactor(p)
+	return g.Affine(p), nil
+}
