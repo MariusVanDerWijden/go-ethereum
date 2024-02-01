@@ -20,12 +20,12 @@ func ecMapG1(u, t, s *fe) (*fe, *fe) {
 	add(Z1, Z1, Z1)
 
 	// Compute projective point in surface S
-	//   y = (2Y1)^2
+	//   y2 = (2Y1)^2
 	//   v = X1*Z1 - u*Y1*Z1
 	//   w = 2*Y1*Z1
-	var y, v, w = new(fe), new(fe), new(fe)
-	add(y, Y1, Y1)
-	square(y, y)
+	var y2, v, w = new(fe), new(fe), new(fe)
+	add(y2, Y1, Y1)
+	square(y2, y2)
 	mul(v, Y1, u)
 	sub(v, X1, v)
 	mul(v, v, Z1)
@@ -41,48 +41,47 @@ func ecMapG1(u, t, s *fe) (*fe, *fe) {
 	mul(x1, v, w)
 	add(x2, u, x1)
 	neg(x2, x2)
-	mul(x3, y, w)
+	mul(x3, y2, w)
 	square(x3, x3)
 	add(x3, u, x3)
 
 	// Compute g(x_i)
 	var y21, y22, y23 *fe = new(fe), new(fe), new(fe)
 	square(y21, x1)
-	add(y21, y21, params.a)
+	//add(y21, y21, params.a)
 	mul(y21, y21, x1)
 	add(y21, y21, params.b)
 
 	square(y22, x2)
-	add(y22, y22, params.a)
+	//add(y22, y22, params.a)
 	mul(y22, y22, x2)
 	add(y22, y22, params.b)
 
 	square(y23, x3)
-	add(y23, y23, params.a)
+	//add(y23, y23, params.a)
 	mul(y23, y23, x3)
 	add(y23, y23, params.b)
 
 	// Find the square
-
-	x, y := new(fe), new(fe)
+	x, y2 := new(fe), new(fe)
 	if !isQuadraticNonResidue(y22) { // c2
 		x.set(x2)
-		y.set(y22)
+		y2.set(y22)
 	} else {
 		x.set(x1)
-		y.set(y21)
+		y2.set(y21)
 	}
 
 	if !isQuadraticNonResidue(y23) { // c3
 		x.set(x3)
-		y.set(y23)
+		y2.set(y23)
 	}
 
 	// Find the square-root and choose sign
-	sqrt(y, y)
-	neg(y22, y)
+	y := new(fe)
+	sqrt(y, y2)
 	if y.sign() != s.sign() { // c1
-		y.set(y22) // TODO non-constant time
+		neg(y, y) // TODO non-constant time
 	}
 	return x, y
 }
