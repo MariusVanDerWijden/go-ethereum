@@ -63,23 +63,28 @@ func ecMapG1(u, t, s *fe) (*fe, *fe) {
 	add(y23, y23, params.b)
 
 	// Find the square
-	if c2 := isQuadraticNonResidue(y22); !c2 {
-		x1 = x2 // TODO non-constant time
-		y21 = y22
+
+	x, y := new(fe), new(fe)
+	if !isQuadraticNonResidue(y22) { // c2
+		x.set(x2)
+		y.set(y22)
+	} else {
+		x.set(x1)
+		y.set(y21)
 	}
 
-	if c3 := isQuadraticNonResidue(y23); !c3 {
-		x1 = x3 // TODO non-constant time
-		y21 = y23
+	if !isQuadraticNonResidue(y23) { // c3
+		x.set(x3)
+		y.set(y23)
 	}
 
 	// Find the square-root and choose sign
-	sqrt(y21, y21)
-	neg(y22, y21)
-	if c1 := y21.sign() == s.sign(); !c1 {
-		y21 = y22 // TODO non-constant time
+	sqrt(y, y)
+	neg(y22, y)
+	if y.sign() != s.sign() { // c1
+		y.set(y22) // TODO non-constant time
 	}
-	return x1, y21
+	return x, y
 }
 
 var eccParamsForG1 = struct {

@@ -27,7 +27,7 @@ func TestSwiftEC(tt *testing.T) {
 		tt.Errorf("expected different encoding: %v got %v", toString(xx), x)
 	}
 	if toString(yy) != y {
-		tt.Errorf("expected different encoding: %v got %v", toString(xx), x)
+		tt.Errorf("expected different encoding: %v got %v", toString(yy), y)
 	}
 }
 
@@ -47,3 +47,28 @@ func strToFe(s string) *fe {
 
 	return x11
 }
+
+func BenchmarkECMapG1(b *testing.B) {
+	u := "0x188114530a157117accadf5223257941ab6148fc30a0a75a143df1b86b023ac2ea1b403465cefd84b6da5de70db194f3"
+	t := "0x9135b44e251b5562b953fdaef68fc1043eb0ace10982588b0d21479d8107d3fec503fa4ef6b78397b3c4aef331f688b"
+	s := "0"
+	ui, ti, si := strToFe(u), strToFe(t), strToFe(s)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ecMapG1(ui, ti, si)
+	}
+}
+
+func BenchmarkSwu(b *testing.B) {
+	u := "0x188114530a157117accadf5223257941ab6148fc30a0a75a143df1b86b023ac2ea1b403465cefd84b6da5de70db194f3"
+	t := "0x9135b44e251b5562b953fdaef68fc1043eb0ace10982588b0d21479d8107d3fec503fa4ef6b78397b3c4aef331f688b"
+	s := "0"
+	ui, _, _ := strToFe(u), strToFe(t), strToFe(s)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		swuMapG1(ui)
+	}
+}
+
+// BenchmarkSwu-24    	   18744	     66977 ns/op	     288 B/op	       6 allocs/op
+// BenchmarkECMapG1-24    	    8391	    139731 ns/op	     288 B/op	       6 allocs/op
