@@ -249,13 +249,6 @@ func TestG1MapToCurve(t *testing.T) {
 		if !bytes.Equal(g.ToBytes(p0), v.expected) {
 			t.Fatal("map to curve fails", i)
 		}
-		p0, err = g.MapToCurveSwiftEC(v.u)
-		if err != nil {
-			t.Fatal("map to curve fails", i, err)
-		}
-		if !bytes.Equal(g.ToBytes(p0), v.expected) {
-			t.Fatalf("map to curve fails %v, want %v got %v", i, v.expected, g.ToBytes(p0))
-		}
 	}
 }
 

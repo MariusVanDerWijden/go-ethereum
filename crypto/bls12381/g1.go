@@ -439,7 +439,14 @@ func (g *G1) MapToCurveSwiftEC(in []byte) (*PointG1, error) {
 	if err != nil {
 		return nil, err
 	}
-	x, y := ecMapG1(u)
+	var t = new(fe).set(u) // TODO figure out what to do here
+	var s = new(fe)
+	if u.sign() {
+		s.one()
+	} else {
+		s.zero()
+	}
+	x, y := ecMapG1(u, t, s)
 	isogenyMapG1(x, y)
 	one := new(fe).one()
 	p := &PointG1{*x, *y, *one}

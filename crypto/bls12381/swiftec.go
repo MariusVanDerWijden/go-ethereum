@@ -1,50 +1,23 @@
 package bls12381
 
-func ecMapG1(u *fe) (*fe, *fe) {
+func ecMapG1(u, t, s *fe) (*fe, *fe) {
 	params := eccParamsForG1
-	var t = new(fe) // TODO figure out what to do here
-	var s = new(fe)
 
-	// Evaluate initial point in conic X(u),Y(u)
-	var X0 = new(fe)
-	mul(X0, params.X[2], u)
-	add(X0, X0, params.X[1])
-	mul(X0, X0, u)
-	add(X0, X0, params.X[0])
-	var Y0 = new(fe)
-	mul(Y0, params.Y[1], u)
-	add(Y0, Y0, params.Y[0])
-
-	// Evaluate f(u)=3u^2+4a and g(u)=u^3+au+b
-	var f = new(fe)
-	square(f, u)
-	var g = new(fe)
-	add(g, f, params.a)
-	mul(g, g, u)
-	add(g, g, params.b)
-	var Z1 = new(fe)
-	add(Z1, f, f)
-	add(f, Z1, f)
-	add(f, f, params.ax4)
-
-	// Compute new point in conic with
-	// X1 = f*(Y0-t*X0)^2 + g
-	// Z1 = X0(1 + f*t^2)
-	// Y1 = Z1*Y0 + t*(X - Z*X0)
-	mul(Z1, t, X0)
-	var Y1 = new(fe)
-	sub(Y1, Y0, Z1)
+	// Evaluate initial point in conic X(u,t),Y(u,t)
 	var X1 = new(fe)
-	square(X1, Y1)
-	mul(X1, X1, f)
-	add(X1, X1, g)
+	square(X1, u)
+	mul(X1, X1, u)
+	var Y1 = new(fe)
+	square(Y1, t)
+	add(X1, X1, params.b)
+	sub(X1, X1, Y1)
+	add(Y1, Y1, Y1)
+	add(Y1, Y1, X1)
+	var Z1 = new(fe)
+	mul(Z1, u, params.X[0])
+	mul(X1, X1, Z1)
 	mul(Z1, Z1, t)
-	mul(Z1, Z1, f)
-	add(Z1, Z1, X0)
-	mul(Y1, Y1, Z1)
-	var tX = new(fe)
-	mul(tX, t, X1)
-	add(Y1, Y1, tX)
+	add(Z1, Z1, Z1)
 
 	// Compute projective point in surface S
 	//   y = (2Y1)^2
@@ -90,29 +63,21 @@ func ecMapG1(u *fe) (*fe, *fe) {
 	add(y23, y23, params.b)
 
 	// Find the square
-	if c2 := !isQuadraticNonResidue(y22); c2 {
-		x1, x2 = x1, x2 // TODO this probably makes this non-constant time
-		y21, y22 = y21, y22
-	} else {
-		x1, x2 = x2, x1
-		y21, y22 = y22, y21
+	if c2 := isQuadraticNonResidue(y22); !c2 {
+		x1 = x2 // TODO non-constant time
+		y21 = y22
 	}
 
-	if c3 := !isQuadraticNonResidue(y23); c3 {
-		x1, x3 = x1, x3 // TODO non-constant time
-		y21, y23 = y21, y23
-	} else {
-		x1, x3 = x3, x1
-		y21, y23 = y23, y21
+	if c3 := isQuadraticNonResidue(y23); !c3 {
+		x1 = x3 // TODO non-constant time
+		y21 = y23
 	}
 
 	// Find the square-root and choose sign
 	sqrt(y21, y21)
 	neg(y22, y21)
-	if c1 := y21.sign() == s.sign(); c1 {
-		y21, y22 = y21, y22
-	} else {
-		y21, y22 = y22, y21
+	if c1 := y21.sign() == s.sign(); !c1 {
+		y21 = y22 // TODO non-constant time
 	}
 	return x1, y21
 }
@@ -130,6 +95,6 @@ var eccParamsForG1 = struct {
 		new(fe)},
 	[2]*fe{new(fe), new(fe)},
 	new(fe),
-	swuParamsForG1.a,
-	swuParamsForG1.b,
+	new(fe),
+	&fe{12260768510540316659, 6038201419376623626, 5156596810353639551, 12813724723179037911, 10288881524157229871, 708830206584151678},
 }
