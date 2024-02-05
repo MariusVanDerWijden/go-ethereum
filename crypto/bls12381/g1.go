@@ -447,7 +447,6 @@ func (g *G1) MapToCurveSwiftEC(in []byte) (*PointG1, error) {
 		s.zero()
 	}
 	x, y := ecMapG1(u, t, s)
-	isogenyMapG1(x, y)
 	one := new(fe).one()
 	p := &PointG1{*x, *y, *one}
 	g.ClearCofactor(p)

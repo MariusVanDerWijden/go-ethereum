@@ -66,7 +66,23 @@ func BenchmarkSwu(b *testing.B) {
 	ui, _, _ := strToFe(u), strToFe(t), strToFe(s)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		swuMapG1(ui)
+		x, y := swuMapG1(ui)
+		isogenyMapG1(x, y)
+	}
+}
+
+func BenchmarkECMapG2(b *testing.B) {
+	params := swuParamsForG2
+	for i := 0; i < b.N; i++ {
+		ecMapG2(params.a, params.a, params.a)
+	}
+}
+
+func BenchmarkSWUG2(b *testing.B) {
+	params := swuParamsForG2
+	for i := 0; i < b.N; i++ {
+		x, y := swuMapG2(nil, params.a)
+		isogenyMapG2(nil, x, y)
 	}
 }
 
