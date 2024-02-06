@@ -64,17 +64,15 @@ func ecMapG1(u, t, s *fe) (*fe, *fe) {
 
 	// Find the square
 	x, y2 := new(fe), new(fe)
-	if !isQuadraticNonResidue(y22) { // c2
+	if !isQuadraticNonResidue(y23) { // c3
+		x.set(x3)
+		y2.set(y23)
+	} else if !isQuadraticNonResidue(y22) { // c2
 		x.set(x2)
 		y2.set(y22)
 	} else {
 		x.set(x1)
 		y2.set(y21)
-	}
-
-	if !isQuadraticNonResidue(y23) { // c3
-		x.set(x3)
-		y2.set(y23)
 	}
 
 	// Find the square-root and choose sign
@@ -149,18 +147,17 @@ func ecMapG2(u, t, s *fe2) (*fe2, *fe2) {
 	e.add(y23, y23, params.b)
 
 	// Find the square
+	// Find the square
 	x, y2 := new(fe2), new(fe2)
-	if !e.isQuadraticNonResidue(y22) { // c2
+	if !e.isQuadraticNonResidue(y23) { // c3
+		x.set(x3)
+		y2.set(y23)
+	} else if !e.isQuadraticNonResidue(y22) { // c2
 		x.set(x2)
 		y2.set(y22)
 	} else {
 		x.set(x1)
 		y2.set(y21)
-	}
-
-	if !e.isQuadraticNonResidue(y23) { // c3
-		x.set(x3)
-		y2.set(y23)
 	}
 
 	// Find the square-root and choose sign

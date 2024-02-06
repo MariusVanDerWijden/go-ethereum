@@ -88,3 +88,5 @@ func BenchmarkSWUG2(b *testing.B) {
 
 // BenchmarkSwu-24    	   18744	     66977 ns/op	     288 B/op	       6 allocs/op
 // BenchmarkECMapG1-24    	    8391	    139731 ns/op	     288 B/op	       6 allocs/op
+// BenchmarkECMapG1-24    	   18232	     67647 ns/op	      96 B/op	       2 allocs/op
+// BenchmarkSwu-24    	   15289	     78494 ns/op	     288 B/op	       6 allocs/op
