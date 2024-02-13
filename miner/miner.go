@@ -155,7 +155,7 @@ func (miner *Miner) getPending() *newPayloadResult {
 	}
 	ret := miner.generateWork(&generateParams{
 		timestamp:   timestamp,
-		forceTime:   true,
+		forceTime:   false,
 		parentHash:  header.Hash(),
 		coinbase:    coinbase,
 		random:      common.Hash{},
