@@ -425,11 +425,6 @@ var (
 	}
 
 	// Miner settings
-	MiningEnabledFlag = &cli.BoolFlag{
-		Name:     "mine",
-		Usage:    "Enable mining",
-		Category: flags.MinerCategory,
-	}
 	MinerGasLimitFlag = &cli.Uint64Flag{
 		Name:     "miner.gaslimit",
 		Usage:    "Target gas ceiling for mined blocks",
@@ -442,11 +437,6 @@ var (
 		Value:    ethconfig.Defaults.Miner.GasPrice,
 		Category: flags.MinerCategory,
 	}
-	MinerEtherbaseFlag = &cli.StringFlag{
-		Name:     "miner.etherbase",
-		Usage:    "0x prefixed public address for block mining rewards",
-		Category: flags.MinerCategory,
-	}
 	MinerExtraDataFlag = &cli.StringFlag{
 		Name:     "miner.extradata",
 		Usage:    "Block extra data set by the miner (default = client version)",
@@ -455,12 +445,6 @@ var (
 	MinerRecommitIntervalFlag = &cli.DurationFlag{
 		Name:     "miner.recommit",
 		Usage:    "Time interval to recreate the block being mined",
-		Value:    ethconfig.Defaults.Miner.Recommit,
-		Category: flags.MinerCategory,
-	}
-	MinerNewPayloadTimeout = &cli.DurationFlag{
-		Name:     "miner.newpayload-timeout",
-		Usage:    "Specify the maximum time allowance for creating a new payload",
 		Value:    ethconfig.Defaults.Miner.Recommit,
 		Category: flags.MinerCategory,
 	}
@@ -1271,6 +1255,7 @@ func setEtherbase(ctx *cli.Context, cfg *ethconfig.Config) {
 	if !ctx.IsSet(MinerEtherbaseFlag.Name) {
 		return
 	}
+	log.Warn("Option --miner.etherbase is deprecated as the etherbase is set by the consensus client post-merge")
 	addr := ctx.String(MinerEtherbaseFlag.Name)
 	if strings.HasPrefix(addr, "0x") || strings.HasPrefix(addr, "0X") {
 		addr = addr[2:]
@@ -1475,6 +1460,9 @@ func setTxPool(ctx *cli.Context, cfg *legacypool.Config) {
 	if ctx.IsSet(TxPoolPriceLimitFlag.Name) {
 		cfg.PriceLimit = ctx.Uint64(TxPoolPriceLimitFlag.Name)
 	}
+	if ctx.IsSet(MinerGasPriceFlag.Name) {
+		cfg.PriceLimit = ctx.Uint64(MinerGasPriceFlag.Name)
+	}
 	if ctx.IsSet(TxPoolPriceBumpFlag.Name) {
 		cfg.PriceBump = ctx.Uint64(TxPoolPriceBumpFlag.Name)
 	}
@@ -1496,6 +1484,9 @@ func setTxPool(ctx *cli.Context, cfg *legacypool.Config) {
 }
 
 func setMiner(ctx *cli.Context, cfg *miner.Config) {
+	if ctx.Bool(MiningEnabledFlag.Name) {
+		log.Warn("The flag --mine is deprecated and will be removed")
+	}
 	if ctx.IsSet(MinerExtraDataFlag.Name) {
 		cfg.ExtraData = []byte(ctx.String(MinerExtraDataFlag.Name))
 	}
@@ -1508,8 +1499,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.IsSet(MinerRecommitIntervalFlag.Name) {
 		cfg.Recommit = ctx.Duration(MinerRecommitIntervalFlag.Name)
 	}
-	if ctx.IsSet(MinerNewPayloadTimeout.Name) {
-		cfg.Recommit = ctx.Duration(MinerNewPayloadTimeout.Name)
+	if ctx.IsSet(MinerNewPayloadTimeoutFlag.Name) {
+		log.Warn("The flag --miner.newpayload-timeout is deprecated and will be removed, please use --miner.recommit")
+		cfg.Recommit = ctx.Duration(MinerNewPayloadTimeoutFlag.Name)
 	}
 }
 
