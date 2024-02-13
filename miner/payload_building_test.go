@@ -58,8 +58,9 @@ var (
 	newTxs     []*types.Transaction
 
 	testConfig = Config{
-		Recommit: time.Second,
-		GasCeil:  params.GenesisGasLimit,
+		Etherbase: testBankAddress,
+		Recommit:  time.Second,
+		GasCeil:   params.GenesisGasLimit,
 	}
 )
 
@@ -142,7 +143,6 @@ func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consens
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.Add(pendingTxs, true, false)
 	w := New(backend, testConfig, engine)
-	w.SetEtherbase(testBankAddress)
 	return w, backend
 }
 
