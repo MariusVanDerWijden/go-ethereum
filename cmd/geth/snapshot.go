@@ -324,9 +324,14 @@ func traverseState(ctx *cli.Context) error {
 			log.Error("Invalid account encountered during traversal", "err", err)
 			return err
 		}
-		if bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) && acc.Nonce == 0 && acc.Balance.IsZero() {
-			log.Error("Empty account found, should not be possible post-merge")
-			return errors.New("empty account found")
+		if bytes.Equal(acc.CodeHash, types.EmptyCodeHash[:]) && acc.Nonce == 0 {
+			if acc.Balance.IsZero() {
+				log.Error("Empty account found, should not be possible post-merge")
+				return errors.New("empty account found")
+			}
+			if acc.Root != types.EmptyRootHash {
+				log.Warn("Account with no code, no nonce but storage", "account", accIter.Key)
+			}
 		}
 		skip := true
 		if !skip && acc.Root != types.EmptyRootHash {
