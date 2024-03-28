@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core"
@@ -38,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
@@ -1372,5 +1374,102 @@ func benchmarkPoolPending(b *testing.B, datacap uint64) {
 		if len(p) != int(capacity) {
 			b.Fatalf("have %d want %d", len(p), capacity)
 		}
+	}
+}
+
+func TestReorgBlobpool(t *testing.T) {
+	var (
+		engine   = beacon.NewFaker()
+		accounts = (30_000_000 / 21_000) - 1
+		alloc    = make(map[common.Address]types.Account)
+		keys     []*ecdsa.PrivateKey
+		bb       = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
+	)
+	// Fill genesis accounts
+	for i := 0; i < accounts; i++ {
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			t.Fail()
+		}
+		alloc[crypto.PubkeyToAddress(key.PublicKey)] = types.Account{
+			Balance: new(big.Int).Mul(big.NewInt(1000105000), big.NewInt(params.GWei)),
+		}
+		keys = append(keys, key)
+	}
+	var (
+		gspec = &core.Genesis{
+			Config:   params.AllDevChainProtocolChanges,
+			Alloc:    alloc,
+			GasLimit: 30_000_000,
+		}
+		signer = types.LatestSigner(gspec.Config)
+	)
+	_, blocks, _ := core.GenerateChainWithGenesis(gspec, engine, 1, func(i int, b *core.BlockGen) {
+		for _, key := range keys {
+			txdata := &types.DynamicFeeTx{
+				ChainID:    gspec.Config.ChainID,
+				Nonce:      0,
+				To:         &bb,
+				Gas:        21000,
+				GasFeeCap:  newGwei(5),
+				GasTipCap:  big.NewInt(2),
+				AccessList: nil,
+				Data:       []byte{},
+				Value:      new(big.Int).Mul(big.NewInt(1), big.NewInt(params.Ether)),
+			}
+			tx := types.NewTx(txdata)
+			tx, _ = types.SignTx(tx, signer, key)
+			b.AddTx(tx)
+		}
+	})
+	// Set up the chain
+	chain, err := core.NewBlockChain(rawdb.NewMemoryDatabase(), nil, gspec, nil, engine, vm.Config{}, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	// Set up and fill the blob pool
+	pool := New(DefaultConfig, chain)
+	pool.Init(0, chain.CurrentBlock(), makeAddressReserver())
+	for _, key := range keys {
+		for i := 0; i < 4; i++ {
+			tx := makeUnsignedTxWithChainID(uint256.MustFromBig(gspec.Config.ChainID), uint64(i), 1000, 1000, 1000)
+			errs := pool.Add([]*types.Transaction{types.MustSignNewTx(key, signer, tx)}, true, true)
+			for _, err := range errs {
+				if err != nil {
+					t.Error(err)
+				}
+			}
+		}
+	}
+	start := time.Now()
+	// Import the blocks
+	for _, block := range blocks {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("block %d: failed to insert into chain: %v", block.NumberU64(), err)
+		}
+	}
+	pool.Reset(chain.Genesis().Header(), chain.CurrentBlock())
+	panic(time.Since(start))
+}
+
+func newGwei(n int64) *big.Int {
+	return new(big.Int).Mul(big.NewInt(n), big.NewInt(params.GWei))
+}
+
+func makeUnsignedTxWithChainID(chainID *uint256.Int, nonce uint64, gasTipCap uint64, gasFeeCap uint64, blobFeeCap uint64) *types.BlobTx {
+	return &types.BlobTx{
+		ChainID:    chainID,
+		Nonce:      nonce,
+		GasTipCap:  uint256.NewInt(gasTipCap),
+		GasFeeCap:  uint256.NewInt(gasFeeCap),
+		Gas:        21000,
+		BlobFeeCap: uint256.NewInt(blobFeeCap),
+		BlobHashes: []common.Hash{emptyBlobVHash, emptyBlobVHash, emptyBlobVHash, emptyBlobVHash, emptyBlobVHash, emptyBlobVHash},
+		Value:      uint256.NewInt(100),
+		Sidecar: &types.BlobTxSidecar{
+			Blobs:       []kzg4844.Blob{*emptyBlob, *emptyBlob, *emptyBlob, *emptyBlob, *emptyBlob, *emptyBlob},
+			Commitments: []kzg4844.Commitment{emptyBlobCommit, emptyBlobCommit, emptyBlobCommit, emptyBlobCommit, emptyBlobCommit, emptyBlobCommit},
+			Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof, emptyBlobProof, emptyBlobProof, emptyBlobProof, emptyBlobProof},
+		},
 	}
 }
