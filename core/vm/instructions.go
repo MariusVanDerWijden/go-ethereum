@@ -434,13 +434,17 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 		num.Clear()
 		return nil, nil
 	}
-
+	historySize := uint64(256)
+	// EIP-2935 extends the observable history window.
+	if interpreter.evm.ChainConfig().IsPrague(interpreter.evm.Context.BlockNumber, interpreter.evm.Context.Time) {
+		historySize = params.HistoryServeWindow
+	}
 	var upper, lower uint64
 	upper = interpreter.evm.Context.BlockNumber.Uint64()
-	if upper < 257 {
+	if upper < historySize+1 {
 		lower = 0
 	} else {
-		lower = upper - 256
+		lower = upper - historySize
 	}
 	if num64 >= lower && num64 < upper {
 		num.SetBytes(interpreter.evm.Context.GetHash(num64).Bytes())
