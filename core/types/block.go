@@ -379,6 +379,16 @@ func (b *Block) Deposits() Deposits {
 	return deps
 }
 
+func (b *Block) WithdrawalRequests() WithdrawalRequests {
+	var wxs WithdrawalRequests
+	for _, r := range b.requests {
+		if w, ok := r.inner.(*WithdrawalRequest); ok {
+			wxs = append(wxs, w)
+		}
+	}
+	return wxs
+}
+
 func (b *Block) Transaction(hash common.Hash) *Transaction {
 	for _, transaction := range b.transactions {
 		if transaction.Hash() == hash {
