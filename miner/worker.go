@@ -215,6 +215,7 @@ func (miner *Miner) prepareWork(genParams *generateParams) (*environment, error)
 	}
 	if miner.chainConfig.IsPrague(header.Number, header.Time) {
 		core.ProcessBlockHashHistory(env.state, header, miner.chainConfig, miner.chain)
+		env.state.Finalise(true)
 	}
 	return env, nil
 }
