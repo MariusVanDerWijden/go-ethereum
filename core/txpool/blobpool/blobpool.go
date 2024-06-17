@@ -1604,7 +1604,7 @@ func (p *BlobPool) Nonce(addr common.Address) uint64 {
 	if txs, ok := p.index[addr]; ok {
 		return txs[len(txs)-1].nonce + 1
 	}
-	return p.state.GetNonce(addr)
+	return 0
 }
 
 // Stats retrieves the current pool stats, namely the number of pending and the
