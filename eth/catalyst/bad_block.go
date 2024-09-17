@@ -102,15 +102,14 @@ func (api *ConsensusAPI) mutate(envelope *engine.ExecutionPayloadEnvelope, beaco
 var hashCache = make(map[common.Hash]struct{})
 
 func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *common.Hash) *engine.ExecutableData {
-	var withdrawalsHash common.Hash
+	var withdrawalsHash *common.Hash
 	if data.Withdrawals != nil {
 		h := types.DeriveSha(types.Withdrawals(data.Withdrawals), trie.NewStackTrie(nil))
-		withdrawalsHash = h
+		withdrawalsHash = &h
 	}
 	hashes := []common.Hash{
 		data.ReceiptsRoot,
 		data.StateRoot,
-		withdrawalsHash,
 		data.BlockHash,
 		data.ParentHash,
 		api.eth.BlockChain().GetCanonicalHash(0),
@@ -120,6 +119,11 @@ func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *
 		api.eth.BlockChain().GetCanonicalHash(data.Number - 1000),
 		api.eth.BlockChain().GetCanonicalHash(data.Number - 90001),
 	}
+	if withdrawalsHash != nil {
+		hashes = append(hashes, *withdrawalsHash)
+	}
+	requests, requestsHash := api.mutateRequests(data, hashes)
+	hashes = append(hashes, requestsHash)
 	// cache the hashes
 	for _, hash := range hashes {
 		hashCache[hash] = struct{}{}
@@ -182,8 +186,13 @@ func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *
 		h := weirdHash(data, *beaconRoot)
 		beaconRoot = &h
 	case 17:
-		h := weirdHash(data, withdrawalsHash)
-		withdrawalsHash = h
+		if withdrawalsHash != nil {
+			h := weirdHash(data, *withdrawalsHash)
+			withdrawalsHash = &h
+		}
+	case 18:
+		h := weirdHash(data, requestsHash)
+		requestsHash = h
 	}
 	if rand.Int()%10 != 0 {
 		// Set correct blockhash in 90% of cases
@@ -210,9 +219,10 @@ func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *
 			ExcessBlobGas:    data.ExcessBlobGas,
 			ParentBeaconRoot: beaconRoot,
 			BlobGasUsed:      data.BlobGasUsed,
-			WithdrawalsHash:  &withdrawalsHash,
+			WithdrawalsHash:  withdrawalsHash,
+			RequestsHash:     &requestsHash,
 		}
-		body := types.Body{Transactions: txs, Withdrawals: data.Withdrawals, Uncles: nil}
+		body := types.Body{Transactions: txs, Withdrawals: data.Withdrawals, Uncles: nil, Requests: requests}
 		block := types.NewBlockWithHeader(header).WithBody(body)
 		data.BlockHash = block.Hash()
 	}
@@ -322,6 +332,104 @@ func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.
 		txhash = types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
 	}
 	return txs, txhash
+}
+
+func (api *ConsensusAPI) mutateRequests(data *engine.ExecutableData, hashes []common.Hash) (types.Requests, common.Hash) {
+	var requestsHash common.Hash
+	var requests types.Requests
+	if data.Deposits != nil {
+		requests = make(types.Requests, 0)
+		for _, d := range data.Deposits {
+			requests = append(requests, types.NewRequest(d))
+		}
+	}
+	if data.WithdrawalRequests != nil {
+		for _, w := range data.WithdrawalRequests {
+			requests = append(requests, types.NewRequest(w))
+		}
+	}
+	if data.ConsolidationRequests != nil {
+		requests = append(requests, data.ConsolidationRequests.Requests()...)
+	}
+	if requests != nil {
+		h := types.DeriveSha(requests, trie.NewStackTrie(nil))
+		requestsHash = h
+	}
+
+	rnd := rand.Int()
+	switch rnd % 5 {
+	case 0:
+		// drop a request
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			requests = append(requests[index-1:], requests[index:]...)
+		}
+	case 1:
+		// drop a request
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			requests[index] = nil
+		}
+	case 2:
+		// replace with empty
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			requests[index] = &types.Request{}
+		}
+	case 3:
+		// duplicate
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			requests = append(requests, requests[index])
+		}
+	case 4:
+		// random deposit
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			var pk [48]byte
+			rand.Read(pk[:])
+			var sig [96]byte
+			rand.Read(sig[:])
+			requests[index] = types.NewRequest(&types.Deposit{
+				PublicKey:             pk,
+				WithdrawalCredentials: weirdHash(data, hashes...),
+				Amount:                rand.Uint64(),
+				Signature:             sig,
+				Index:                 rand.Uint64(),
+			})
+		}
+	case 5:
+		// random withdrawal
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			var pk [48]byte
+			rand.Read(pk[:])
+			requests[index] = types.NewRequest(&types.WithdrawalRequest{
+				PublicKey: pk,
+				Source:    common.BytesToAddress(weirdHash(data, hashes...).Bytes()),
+				Amount:    rand.Uint64(),
+			})
+		}
+	case 6:
+		// random consolidation
+		if len(requests) > 0 {
+			index := rand.Intn(len(requests))
+			var pk [48]byte
+			rand.Read(pk[:])
+			var target [48]byte
+			rand.Read(target[:])
+			requests[index] = types.NewRequest(&types.ConsolidationRequest{
+				SourcePublicKey: pk,
+				Source:          common.BytesToAddress(weirdHash(data, hashes...).Bytes()),
+				TargetPublicKey: target,
+			})
+		}
+	case 7:
+		// append a nil request
+		requests = append(requests, types.NewRequest(&types.ConsolidationRequest{}))
+	}
+
+	return requests, requestsHash
 }
 
 func randomSize() int {
