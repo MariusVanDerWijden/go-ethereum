@@ -188,3 +188,22 @@ func createTestLegacyTxInner() *LegacyTx {
 		Data:     nil,
 	}
 }
+
+func BenchmarkSignatureValuesLegacy(b *testing.B) {
+	benchSigValues(b, &HomesteadSigner{})
+}
+
+func BenchmarkSignatureValuesLatest(b *testing.B) {
+	benchSigValues(b, NewCancunSigner(big.NewInt(0)))
+}
+
+func benchSigValues(b *testing.B, signer Signer) {
+	tx := NewTx(createTestLegacyTxInner())
+	sk, _ := crypto.GenerateKey()
+	h := tx.Hash()
+	sig, _ := crypto.Sign(h[:], sk)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		signer.SignatureValues(tx, sig)
+	}
+}
