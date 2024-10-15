@@ -198,12 +198,30 @@ func BenchmarkSignatureValuesLatest(b *testing.B) {
 }
 
 func benchSigValues(b *testing.B, signer Signer) {
-	tx := NewTx(createTestLegacyTxInner())
+	tx := NewTx(&AccessListTx{ChainID: common.Big0})
 	sk, _ := crypto.GenerateKey()
 	h := tx.Hash()
 	sig, _ := crypto.Sign(h[:], sk)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		signer.SignatureValues(tx, sig)
+	}
+}
+
+func BenchmarkSenderLegacy(b *testing.B) {
+	benchSender(b, &HomesteadSigner{})
+}
+
+func BenchmarkSenderLatest(b *testing.B) {
+	benchSender(b, NewCancunSigner(big.NewInt(0)))
+}
+
+func benchSender(b *testing.B, signer Signer) {
+	tx := NewTx(&AccessListTx{ChainID: common.Big0})
+	sk, _ := crypto.GenerateKey()
+	tx, _ = SignTx(tx, NewCancunSigner(common.Big0), sk)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		signer.Sender(tx)
 	}
 }
