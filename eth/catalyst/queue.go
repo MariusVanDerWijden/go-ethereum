@@ -83,9 +83,9 @@ func (q *payloadQueue) get(id engine.PayloadID, full bool) (*engine.ExecutionPay
 		}
 		if item.id == id {
 			if !full {
-				return item.payload.Resolve()
+				return item.payload.Resolve(), item.payload.BeaconRoot
 			}
-			return item.payload.ResolveFull()
+			return item.payload.ResolveFull(), item.payload.BeaconRoot
 		}
 	}
 	return nil, nil

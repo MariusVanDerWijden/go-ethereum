@@ -87,8 +87,11 @@ func weirdByteSlice(data []byte) []byte {
 }
 
 func (api *ConsensusAPI) mutate(envelope *engine.ExecutionPayloadEnvelope, beaconRoot *common.Hash) *engine.ExecutionPayloadEnvelope {
+	// mutate requests
+	requests, requestsHash := api.mutateRequests(envelope.Requests)
+	envelope.Requests = requests
 	// mutate payload
-	envelope.ExecutionPayload = api.mutatePayload(envelope.ExecutionPayload, beaconRoot)
+	envelope.ExecutionPayload = api.mutatePayload(envelope.ExecutionPayload, beaconRoot, requestsHash)
 	// mutate blobs
 	envelope = api.mutateBlobs(envelope)
 	// mutate basic fields, shouldn't do anything anyway
@@ -101,13 +104,14 @@ func (api *ConsensusAPI) mutate(envelope *engine.ExecutionPayloadEnvelope, beaco
 
 var hashCache = make(map[common.Hash]struct{})
 
-func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *common.Hash) *engine.ExecutableData {
+func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *common.Hash, requestsHash common.Hash) *engine.ExecutableData {
 	var withdrawalsHash *common.Hash
 	if data.Withdrawals != nil {
 		h := types.DeriveSha(types.Withdrawals(data.Withdrawals), trie.NewStackTrie(nil))
 		withdrawalsHash = &h
 	}
 	hashes := []common.Hash{
+		requestsHash,
 		data.ReceiptsRoot,
 		data.StateRoot,
 		data.BlockHash,
@@ -122,8 +126,9 @@ func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *
 	if withdrawalsHash != nil {
 		hashes = append(hashes, *withdrawalsHash)
 	}
-	requests, requestsHash := api.mutateRequests(data, hashes)
-	hashes = append(hashes, requestsHash)
+	if beaconRoot != nil {
+		hashes = append(hashes, *beaconRoot)
+	}
 	// cache the hashes
 	for _, hash := range hashes {
 		hashCache[hash] = struct{}{}
@@ -222,7 +227,7 @@ func (api *ConsensusAPI) mutatePayload(data *engine.ExecutableData, beaconRoot *
 			WithdrawalsHash:  withdrawalsHash,
 			RequestsHash:     &requestsHash,
 		}
-		body := types.Body{Transactions: txs, Withdrawals: data.Withdrawals, Uncles: nil, Requests: requests}
+		body := types.Body{Transactions: txs, Withdrawals: data.Withdrawals, Uncles: nil}
 		block := types.NewBlockWithHeader(header).WithBody(body)
 		data.BlockHash = block.Hash()
 	}
@@ -334,26 +339,10 @@ func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.
 	return txs, txhash
 }
 
-func (api *ConsensusAPI) mutateRequests(data *engine.ExecutableData, hashes []common.Hash) (types.Requests, common.Hash) {
+func (api *ConsensusAPI) mutateRequests(requests [][]byte) ([][]byte, common.Hash) {
 	var requestsHash common.Hash
-	var requests types.Requests
-	if data.Deposits != nil {
-		requests = make(types.Requests, 0)
-		for _, d := range data.Deposits {
-			requests = append(requests, types.NewRequest(d))
-		}
-	}
-	if data.WithdrawalRequests != nil {
-		for _, w := range data.WithdrawalRequests {
-			requests = append(requests, types.NewRequest(w))
-		}
-	}
-	if data.ConsolidationRequests != nil {
-		requests = append(requests, data.ConsolidationRequests.Requests()...)
-	}
 	if requests != nil {
-		h := types.DeriveSha(requests, trie.NewStackTrie(nil))
-		requestsHash = h
+		requestsHash = types.CalcRequestsHash(requests)
 	}
 
 	rnd := rand.Int()
@@ -374,7 +363,7 @@ func (api *ConsensusAPI) mutateRequests(data *engine.ExecutableData, hashes []co
 		// replace with empty
 		if len(requests) > 0 {
 			index := rand.Intn(len(requests))
-			requests[index] = &types.Request{}
+			requests[index] = make([]byte, 0)
 		}
 	case 3:
 		// duplicate
@@ -386,47 +375,35 @@ func (api *ConsensusAPI) mutateRequests(data *engine.ExecutableData, hashes []co
 		// random deposit
 		if len(requests) > 0 {
 			index := rand.Intn(len(requests))
-			var pk [48]byte
-			rand.Read(pk[:])
-			var sig [96]byte
-			rand.Read(sig[:])
-			requests[index] = types.NewRequest(&types.Deposit{
-				PublicKey:             pk,
-				WithdrawalCredentials: weirdHash(data, hashes...),
-				Amount:                rand.Uint64(),
-				Signature:             sig,
-				Index:                 rand.Uint64(),
-			})
+			var log [576]byte
+			rand.Read(log[:])
+			requests[index], _ = types.DepositLogToRequest(log[:])
 		}
 	case 5:
 		// random withdrawal
 		if len(requests) > 0 {
 			index := rand.Intn(len(requests))
-			var pk [48]byte
-			rand.Read(pk[:])
-			requests[index] = types.NewRequest(&types.WithdrawalRequest{
-				PublicKey: pk,
-				Source:    common.BytesToAddress(weirdHash(data, hashes...).Bytes()),
-				Amount:    rand.Uint64(),
-			})
+			var log [48]byte
+			rand.Read(log[:])
+			requests[index] = log[:]
 		}
 	case 6:
 		// random consolidation
 		if len(requests) > 0 {
 			index := rand.Intn(len(requests))
-			var pk [48]byte
-			rand.Read(pk[:])
-			var target [48]byte
-			rand.Read(target[:])
-			requests[index] = types.NewRequest(&types.ConsolidationRequest{
-				SourcePublicKey: pk,
-				Source:          common.BytesToAddress(weirdHash(data, hashes...).Bytes()),
-				TargetPublicKey: target,
-			})
+			var log [48]byte
+			rand.Read(log[:])
+			requests[index] = log[:]
 		}
 	case 7:
 		// append a nil request
-		requests = append(requests, types.NewRequest(&types.ConsolidationRequest{}))
+		index := rand.Intn(len(requests))
+		var log []byte
+		requests[index] = log[:]
+	}
+
+	if rand.Int()%2 == 0 {
+		requestsHash = types.CalcRequestsHash(requests)
 	}
 
 	return requests, requestsHash

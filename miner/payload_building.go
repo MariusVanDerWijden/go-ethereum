@@ -81,6 +81,7 @@ type Payload struct {
 	stop          chan struct{}
 	lock          sync.Mutex
 	cond          *sync.Cond
+	BeaconRoot    *common.Hash
 }
 
 // newPayload initializes the payload object.
@@ -135,7 +136,7 @@ func (payload *Payload) update(r *newPayloadResult, elapsed time.Duration) {
 
 // Resolve returns the latest built payload and also terminates the background
 // thread for updating payload. It's safe to be called multiple times.
-func (payload *Payload) Resolve() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
+func (payload *Payload) Resolve() *engine.ExecutionPayloadEnvelope {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
@@ -162,7 +163,7 @@ func (payload *Payload) Resolve() (*engine.ExecutionPayloadEnvelope, *common.Has
 
 // ResolveEmpty is basically identical to Resolve, but it expects empty block only.
 // It's only used in tests.
-func (payload *Payload) ResolveEmpty() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
+func (payload *Payload) ResolveEmpty() *engine.ExecutionPayloadEnvelope {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
@@ -176,14 +177,14 @@ func (payload *Payload) ResolveEmpty() (*engine.ExecutionPayloadEnvelope, *commo
 
 // ResolveFull is basically identical to Resolve, but it expects full block only.
 // Don't call Resolve until ResolveFull returns, otherwise it might block forever.
-func (payload *Payload) ResolveFull() (*engine.ExecutionPayloadEnvelope, *common.Hash) {
+func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 	payload.lock.Lock()
 	defer payload.lock.Unlock()
 
 	if payload.full == nil {
 		select {
 		case <-payload.stop:
-			return nil, nil
+			return nil
 		default:
 		}
 		// Wait the full payload construction. Note it might block
@@ -226,6 +227,7 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 	}
 	// Construct a payload object for return.
 	payload := newPayload(empty.block, empty.requests, empty.witness, args.Id())
+	payload.BeaconRoot = args.BeaconRoot
 
 	// Spin up a routine for updating the payload in background. This strategy
 	// can maximum the revenue for including transactions with highest fee.
