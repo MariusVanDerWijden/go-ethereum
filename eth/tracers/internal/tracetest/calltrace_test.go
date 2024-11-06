@@ -230,7 +230,7 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 	evm.SetTxContext(txContext)
 
 	for i := 0; i < b.N; i++ {
-		snap := state.StateDB.Snapshot()
+		state.StateDB.Snapshot()
 		st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()))
 		if _, err = st.TransitionDb(); err != nil {
 			b.Fatalf("failed to execute transaction: %v", err)
@@ -238,7 +238,7 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 		if _, err = tracer.GetResult(); err != nil {
 			b.Fatal(err)
 		}
-		state.StateDB.RevertToSnapshot(snap)
+		state.StateDB.RevertSnapshot()
 	}
 }
 
