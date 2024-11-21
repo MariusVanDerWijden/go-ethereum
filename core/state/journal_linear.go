@@ -84,6 +84,10 @@ func (j *linearJournal) snapshot() {
 // revertSnapshot reverts all state changes made since the last call to snapshot().
 func (j *linearJournal) revertSnapshot(s *StateDB) {
 	id := len(j.revisions) - 1
+	if id == -1 {
+		j.snapshot()
+		return
+	}
 	revision := j.revisions[id]
 	// Replay the linearJournal to undo changes and remove invalidated snapshots
 	j.revertTo(s, revision)
@@ -100,6 +104,9 @@ func (j *linearJournal) discardSnapshot() {
 		// end by clearing and resetting the journal. Invoking a discardSnapshot
 		// afterwards will land here: calling discard on an empty journal.
 		// This is fine
+		return
+	}
+	if id == -1 {
 		return
 	}
 	j.revisions = j.revisions[:id]

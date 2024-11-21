@@ -360,6 +360,9 @@ func (j *sparseJournal) revertSnapshot(s *StateDB) {
 	id := len(j.entries) - 1
 	j.entries[id].revert(s)
 	j.entries = j.entries[:id]
+	if id == 0 {
+		j.snapshot()
+	}
 }
 
 // discardSnapshot removes the latest snapshot; after calling this
