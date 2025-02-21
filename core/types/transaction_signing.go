@@ -110,7 +110,7 @@ func LatestSignerForChainID(chainID *big.Int) Signer {
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
 	h := s.Hash(tx)
 	if inner, ok := tx.inner.(*FalconTx); ok {
-		sig, err := falcon.Sign(h, prv.D.Bytes(), falcon.SigCompressed)
+		sig, err := falcon.Sign(h[:], prv.D.Bytes(), falcon.SigCompressed)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +211,7 @@ func (s falconSigner) Sender(tx *Transaction) (common.Address, error) {
 	}
 	// Need to verify here
 	msg := s.Hash(tx)
-	return txData.Sender, falcon.Verify(txData.Signature, msg, txData.Sender, falcon.SigCompressed)
+	return txData.Sender, falcon.Verify(txData.Signature, msg[:], txData.Sender[:], falcon.SigCompressed)
 }
 
 func (s falconSigner) Equal(s2 Signer) bool {
