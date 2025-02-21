@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/zhenfeizhang/falcon-go/falcon"
 )
 
 var ErrInvalidChainId = errors.New("invalid chain id for signer")
@@ -108,6 +109,13 @@ func LatestSignerForChainID(chainID *big.Int) Signer {
 // SignTx signs the transaction using the given signer and private key.
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
 	h := s.Hash(tx)
+	if inner, ok := tx.inner.(*FalconTx); ok {
+		sig, err := falcon.Sign(h, prv.D.Bytes(), falcon.SigCompressed)
+		if err != nil {
+			return nil, err
+		}
+		inner.Signature = sig
+	}
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
 		return nil, err
@@ -176,6 +184,69 @@ type Signer interface {
 
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
+}
+
+type falconSigner struct{ pragueSigner }
+
+// NewFalconSigner returns a signer that accepts
+// - RIP-??? falcon pq transactions
+// - EIP-7702 set code transactions
+// - EIP-4844 blob transactions
+// - EIP-1559 dynamic fee transactions
+// - EIP-2930 access list transactions,
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewFalconSigner(chainId *big.Int) Signer {
+	signer, _ := NewPragueSigner(chainId).(pragueSigner)
+	return falconSigner{signer}
+}
+
+func (s falconSigner) Sender(tx *Transaction) (common.Address, error) {
+	if tx.Type() != FalconTxType {
+		return s.pragueSigner.Sender(tx)
+	}
+	txData, ok := tx.inner.(*FalconTx)
+	if !ok {
+		panic("shouldn't happen")
+	}
+	// Need to verify here
+	msg := s.Hash(tx)
+	return txData.Sender, falcon.Verify(txData.Signature, msg, txData.Sender, falcon.SigCompressed)
+}
+
+func (s falconSigner) Equal(s2 Signer) bool {
+	x, ok := s2.(falconSigner)
+	return ok && x.chainId.Cmp(s.chainId) == 0
+}
+
+func (s falconSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
+	_, ok := tx.inner.(*FalconTx)
+	if !ok {
+		return s.pragueSigner.SignatureValues(tx, sig)
+	}
+	panic("should not happen")
+}
+
+// Hash returns the hash to be signed by the sender.
+// It does not uniquely identify the transaction.
+func (s falconSigner) Hash(tx *Transaction) common.Hash {
+	if tx.Type() != FalconTxType {
+		return s.pragueSigner.Hash(tx)
+	}
+	return prefixedRlpHash(
+		tx.Type(),
+		[]interface{}{
+			s.chainId,
+			tx.Nonce(),
+			tx.GasTipCap(),
+			tx.GasFeeCap(),
+			tx.Gas(),
+			tx.To(),
+			tx.Value(),
+			tx.Data(),
+			tx.AccessList(),
+			tx.SetCodeAuthorizations(),
+		})
 }
 
 type pragueSigner struct{ cancunSigner }
