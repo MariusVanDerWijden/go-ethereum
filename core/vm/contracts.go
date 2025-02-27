@@ -954,6 +954,12 @@ func (c *bls12381Pairing) Run(input []byte) ([]byte, error) {
 		if !p2.IsInSubGroup() {
 			return nil, errBLS12381G2PointSubgroup
 		}
+		// according to the EIP any pairing with infinity should return 1
+		if p1.IsInfinity() || p2.IsInfinity() {
+			out := make([]byte, 32)
+			out[31] = 1
+			return out, nil
+		}
 		p = append(p, *p1)
 		q = append(q, *p2)
 	}
