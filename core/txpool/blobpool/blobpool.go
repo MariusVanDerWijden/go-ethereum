@@ -511,6 +511,18 @@ func (p *BlobPool) parseTransaction(id uint64, size uint32, blob []byte) error {
 	return nil
 }
 
+func isUnique[T comparable](arr []T) bool {
+	seen := make(map[T]struct{}, len(arr))
+	for _, element := range arr {
+		if _, ok := seen[element]; !ok {
+			seen[element] = struct{}{}
+		} else {
+			return false
+		}
+	}
+	return true
+}
+
 // recheck verifies the pool's content for a specific account and drops anything
 // that does not fit anymore (dangling or filled nonce, overdraft).
 func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint64) {
@@ -546,6 +558,9 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 			if filled && inclusions != nil {
 				p.offload(addr, txs[i].nonce, txs[i].id, inclusions)
 			}
+		}
+		if !isUnique(ids) || !isUnique(nonces) {
+			panic("not unique at 1")
 		}
 		delete(p.index, addr)
 		delete(p.spent, addr)
@@ -588,6 +603,10 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 				p.offload(addr, txs[0].nonce, txs[0].id, inclusions)
 			}
 			txs = txs[1:]
+		}
+
+		if !isUnique(ids) || !isUnique(nonces) {
+			panic("not unique at 2")
 		}
 		log.Trace("Dropping overlapped blob transactions", "from", addr, "overlapped", nonces, "ids", ids, "left", len(txs))
 		dropOverlappedMeter.Mark(int64(len(ids)))
@@ -663,6 +682,10 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 		}
 		txs = txs[:i]
 
+		if !isUnique(ids) || !isUnique(nonces) {
+			panic("not unique at 3")
+		}
+
 		log.Error("Dropping gapped blob transactions", "from", addr, "missing", txs[i-1].nonce+1, "drop", nonces, "ids", ids)
 		dropGappedMeter.Mark(int64(len(ids)))
 
@@ -698,6 +721,10 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 			p.spent[addr] = new(uint256.Int).Sub(p.spent[addr], last.costCap)
 			p.stored -= uint64(last.size)
 			p.lookup.untrack(last)
+		}
+
+		if !isUnique(ids) || !isUnique(nonces) {
+			panic("not unique at 4")
 		}
 		if len(txs) == 0 {
 			delete(p.index, addr)
@@ -738,6 +765,10 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 			p.spent[addr] = new(uint256.Int).Sub(p.spent[addr], last.costCap)
 			p.stored -= uint64(last.size)
 			p.lookup.untrack(last)
+		}
+
+		if !isUnique(ids) || !isUnique(nonces) {
+			panic("not unique at 5")
 		}
 		p.index[addr] = txs
 
