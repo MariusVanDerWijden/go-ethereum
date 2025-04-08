@@ -568,7 +568,7 @@ func (api *ConsensusAPI) GetBlobsV1(hashes []common.Hash) ([]*engine.BlobAndProo
 		index[hash] = i
 	}
 	for i, sidecar := range sidecars {
-		if res[i] != nil && sidecar == nil {
+		if res[i] != nil || sidecar == nil {
 			// already filled
 			continue
 		}
