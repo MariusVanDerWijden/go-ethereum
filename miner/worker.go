@@ -396,7 +396,6 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 					continue
 				}
 			}
-
 		}
 
 		// Error may be ignored here. The error has already been checked
