@@ -124,6 +124,11 @@ func CreateAddress2(b common.Address, salt [32]byte, inithash []byte) common.Add
 	return common.BytesToAddress(Keccak256([]byte{0xff}, b.Bytes(), salt[:], inithash)[12:])
 }
 
+// CreateAddress3 creates an ethereum address given the address bytes and a salt.
+func CreateAddress3(b common.Address, salt [32]byte) common.Address {
+	return common.BytesToAddress(Keccak256([]byte{0xff}, common.LeftPadBytes(b.Bytes(), 32), salt[:])[12:])
+}
+
 // ToECDSA creates a private key with the given D value.
 func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 	return toECDSA(d, true)

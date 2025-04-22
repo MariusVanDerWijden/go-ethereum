@@ -42,6 +42,8 @@ type sigCache struct {
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) Signer {
 	var signer Signer
 	switch {
+	case config.IsOsaka(blockNumber, blockTime):
+		signer = NewOsakaSigner(config.ChainID)
 	case config.IsPrague(blockNumber, blockTime):
 		signer = NewPragueSigner(config.ChainID)
 	case config.IsCancun(blockNumber, blockTime):
@@ -71,6 +73,8 @@ func LatestSigner(config *params.ChainConfig) Signer {
 	var signer Signer
 	if config.ChainID != nil {
 		switch {
+		case config.OsakaTime != nil:
+			signer = NewOsakaSigner(config.ChainID)
 		case config.PragueTime != nil:
 			signer = NewPragueSigner(config.ChainID)
 		case config.CancunTime != nil:
@@ -100,7 +104,7 @@ func LatestSigner(config *params.ChainConfig) Signer {
 func LatestSignerForChainID(chainID *big.Int) Signer {
 	var signer Signer
 	if chainID != nil {
-		signer = NewPragueSigner(chainID)
+		signer = NewOsakaSigner(chainID)
 	} else {
 		signer = HomesteadSigner{}
 	}
@@ -219,6 +223,9 @@ func newModernSigner(chainID *big.Int, fork forks.Fork) Signer {
 	if fork >= forks.Prague {
 		s.txtypes[SetCodeTxType] = struct{}{}
 	}
+	if fork >= forks.Osaka {
+		s.txtypes[CreateTxType] = struct{}{}
+	}
 	return s
 }
 
@@ -274,6 +281,18 @@ func (s *modernSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *bi
 	R, S, _ = decodeSignature(sig)
 	V = big.NewInt(int64(sig[64]))
 	return R, S, V, nil
+}
+
+// NewOsakaSigner returns a signer that accepts
+// - EIP-7873 create eof transactions
+// - EIP-7702 set code transactions
+// - EIP-4844 blob transactions
+// - EIP-1559 dynamic fee transactions
+// - EIP-2930 access list transactions,
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewOsakaSigner(chainId *big.Int) Signer {
+	return newModernSigner(chainId, forks.Osaka)
 }
 
 // NewPragueSigner returns a signer that accepts
