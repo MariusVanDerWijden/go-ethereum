@@ -225,11 +225,11 @@ func validateControlFlow(code []byte, section int, metadata []*functionMetadata,
 	if qualifiedExit != (metadata[section].outputs < maxOutputItems) {
 		return 0, fmt.Errorf("%w no RETF or qualified JUMPF", errInvalidNonReturningFlag)
 	}
-	if maxStackHeight >= int(params.StackLimit) {
+	if maxStackHeight > int(params.StackLimit) {
 		return 0, ErrStackOverflow{maxStackHeight, int(params.StackLimit)}
 	}
-	if maxStackHeight != int(metadata[section].maxStackHeight) {
-		return 0, fmt.Errorf("%w in code section %d: have %d, want %d", errInvalidMaxStackHeight, section, maxStackHeight, metadata[section].maxStackHeight)
+	if maxStackHeight != int(metadata[section].inputs)+int(metadata[section].maxStackIncrease) {
+		return 0, fmt.Errorf("%w in code section %d: have %d, want %d", errInvalidMaxStackHeight, section, maxStackHeight, int(metadata[section].inputs)+int(metadata[section].maxStackIncrease))
 	}
 	return visitCount, nil
 }

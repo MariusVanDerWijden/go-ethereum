@@ -75,7 +75,7 @@ func opCallf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 		idx = binary.BigEndian.Uint16(scope.Contract.Code[*pc+1:])
 		typ = scope.Contract.Container.types[idx]
 	)
-	if scope.Stack.len()+int(typ.maxStackHeight)-int(typ.inputs) > 1024 {
+	if scope.Stack.len()+int(typ.maxStackIncrease) > 1024 {
 		return nil, fmt.Errorf("stack overflow")
 	}
 	if scope.ReturnStack.Len() > 1024 {
@@ -111,7 +111,7 @@ func opJumpf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 		idx = binary.BigEndian.Uint16(scope.Contract.Code[*pc+1:])
 		typ = scope.Contract.Container.types[idx]
 	)
-	if scope.Stack.len()+int(typ.maxStackHeight)-int(typ.inputs) > 1024 {
+	if scope.Stack.len()+int(typ.maxStackIncrease) > 1024 {
 		return nil, fmt.Errorf("stack overflow")
 	}
 	scope.CodeSection = uint64(idx)

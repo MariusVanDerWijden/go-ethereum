@@ -39,7 +39,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 		},
 		{
 			code: []byte{
@@ -47,7 +47,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETF),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackHeight: 0}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackIncrease: 0}},
 		},
 		{
 			code: []byte{
@@ -57,7 +57,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETF),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackIncrease: 1}},
 		},
 		{
 			code: []byte{
@@ -65,7 +65,7 @@ func TestValidateCode(t *testing.T) {
 				byte(POP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 			err:      errInvalidCodeTermination,
 		},
 		{
@@ -77,7 +77,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 0}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 0}},
 			err:      errUnreachableCode,
 		},
 		{
@@ -88,7 +88,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 			err:      ErrStackUnderflow{stackLen: 1, required: 2},
 		},
 		{
@@ -99,7 +99,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 2}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 2}},
 			err:      errInvalidMaxStackHeight,
 		},
 		{
@@ -114,7 +114,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 			err:      errInvalidJumpDest,
 		},
 		{
@@ -132,7 +132,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 			err:      errInvalidJumpDest,
 		},
 		{
@@ -143,7 +143,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 			err:      errTruncatedImmediate,
 		},
 		{
@@ -161,7 +161,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RJUMP), 0xff, 0xef,
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 3}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 3}},
 			err:      errUnreachableCode,
 		},
 		{
@@ -180,7 +180,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETURN),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 3}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 3}},
 		},
 		{
 			code: []byte{
@@ -198,7 +198,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETURN),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 3}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 3}},
 		},
 		{
 			code: []byte{
@@ -207,7 +207,7 @@ func TestValidateCode(t *testing.T) {
 				byte(INVALID),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 0}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 0}},
 			err:      errUnreachableCode,
 		},
 		{
@@ -215,7 +215,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETF),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 1, maxStackHeight: 0}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 1, maxStackIncrease: 0}},
 			err:      errInvalidOutputs,
 		},
 		{
@@ -223,7 +223,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETF),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 3, outputs: 3, maxStackHeight: 3}},
+			metadata: []*functionMetadata{{inputs: 3, outputs: 3, maxStackIncrease: 3}},
 		},
 		{
 			code: []byte{
@@ -232,7 +232,7 @@ func TestValidateCode(t *testing.T) {
 				byte(STOP),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}, {inputs: 0, outputs: 1, maxStackHeight: 0}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}, {inputs: 0, outputs: 1, maxStackIncrease: 0}},
 		},
 		{
 			code: []byte{
@@ -243,7 +243,7 @@ func TestValidateCode(t *testing.T) {
 				byte(RETF),
 			},
 			section:  0,
-			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackHeight: 2}, {inputs: 2, outputs: 1, maxStackHeight: 2}},
+			metadata: []*functionMetadata{{inputs: 0, outputs: 0, maxStackIncrease: 2}, {inputs: 2, outputs: 1, maxStackIncrease: 2}},
 		},
 	} {
 		container := MakeTestContainer(
@@ -273,7 +273,7 @@ func BenchmarkRJUMPI(b *testing.B) {
 	}
 	code = append(code, byte(STOP))
 	container := MakeTestContainer(
-		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 		[][]byte{code},
 		[]*Container{},
 		[]byte{},
@@ -307,7 +307,7 @@ func BenchmarkRJUMPV(b *testing.B) {
 	code = append(code, byte(PUSH0))
 	code = append(code, byte(STOP))
 	container := MakeTestContainer(
-		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 		[][]byte{code},
 		[]*Container{},
 		[]byte{},
@@ -338,7 +338,7 @@ func BenchmarkEOFValidation(b *testing.B) {
 	}
 	// First container
 	codeSections = append(codeSections, append(code, byte(STOP)))
-	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackHeight: 0})
+	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackIncrease: 0})
 
 	inner := []byte{
 		byte(RETF),
@@ -346,7 +346,7 @@ func BenchmarkEOFValidation(b *testing.B) {
 
 	for i := 0; i < 1023; i++ {
 		codeSections = append(codeSections, inner)
-		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackHeight: 0})
+		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackIncrease: 0})
 	}
 
 	for i := 0; i < 12; i++ {
@@ -387,7 +387,7 @@ func BenchmarkEOFValidation2(b *testing.B) {
 	code = append(code, byte(STOP))
 	// First container
 	codeSections = append(codeSections, code)
-	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackHeight: 0})
+	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackIncrease: 0})
 
 	inner := []byte{
 		byte(CALLF), 0x03, 0xE8,
@@ -407,7 +407,7 @@ func BenchmarkEOFValidation2(b *testing.B) {
 
 	for i := 0; i < 1023; i++ {
 		codeSections = append(codeSections, inner)
-		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackHeight: 0})
+		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackIncrease: 0})
 	}
 
 	container := MakeTestContainer(types, codeSections, []*Container{}, []byte{}, 0)
@@ -455,17 +455,17 @@ func BenchmarkEOFValidation3(b *testing.B) {
 	}
 	code = append(code, byte(STOP))
 	codeSections = append(codeSections, code)
-	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackHeight: 1})
+	types = append(types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackIncrease: 1})
 
 	// Other containers
 	for i := 0; i < 1023; i++ {
 		codeSections = append(codeSections, []byte{byte(RJUMP), 0x00, 0x00, byte(RETF)})
-		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackHeight: 0})
+		types = append(types, &functionMetadata{inputs: 0, outputs: 0, maxStackIncrease: 0})
 	}
 	// Other containers
 	for i := 0; i < 68; i++ {
 		codeSections[i+1] = append(snippet, byte(RETF))
-		types[i+1] = &functionMetadata{inputs: 0, outputs: 0, maxStackHeight: 1}
+		types[i+1] = &functionMetadata{inputs: 0, outputs: 0, maxStackIncrease: 1}
 	}
 	container := MakeTestContainer(types, codeSections, []*Container{}, []byte{}, 0)
 	bin := container.MarshalBinary()
@@ -500,7 +500,7 @@ func BenchmarkRJUMPI_2(b *testing.B) {
 	}
 	code = append(code, byte(STOP))
 	container := MakeTestContainer(
-		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 		[][]byte{code},
 		[]*Container{},
 		[]byte{},
@@ -525,7 +525,7 @@ func FuzzUnmarshalBinary(f *testing.F) {
 func FuzzValidate(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, code []byte, maxStack uint16) {
 		var container Container
-		container.types = append(container.types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackHeight: maxStack})
+		container.types = append(container.types, &functionMetadata{inputs: 0, outputs: 0x80, maxStackIncrease: maxStack})
 		validateCode(code, 0, &container, &eofInstructionSet, true)
 	})
 }

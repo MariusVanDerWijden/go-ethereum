@@ -73,7 +73,7 @@ func TestEOFMarshaling(t *testing.T) {
 	}{
 		{
 			want: Container{
-				types:              []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+				types:              []*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 				codeSectionOffsets: []int{19, 22}, // 604200, endMarker
 				dataSize:           3,
 				rawContainer:       common.Hex2Bytes("ef000101000402000100030400030000800001604200010203"),
@@ -82,9 +82,9 @@ func TestEOFMarshaling(t *testing.T) {
 		{
 			want: Container{
 				types: []*functionMetadata{
-					{inputs: 0, outputs: 0x80, maxStackHeight: 1},
-					{inputs: 2, outputs: 3, maxStackHeight: 4},
-					{inputs: 1, outputs: 1, maxStackHeight: 1},
+					{inputs: 0, outputs: 0x80, maxStackIncrease: 1},
+					{inputs: 2, outputs: 3, maxStackIncrease: 4},
+					{inputs: 1, outputs: 1, maxStackIncrease: 1},
 				},
 				codeSectionOffsets: []int{31, 34, 39, 40}, // 604200, 6042604200, 00, endMarker
 				rawContainer:       common.Hex2Bytes("ef000101000c02000300030005000104000000008000010203000401010001604200604260420000"),
@@ -111,7 +111,7 @@ func TestEOFSubcontainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	container := MakeTestContainer(
-		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackHeight: 1}},
+		[]*functionMetadata{{inputs: 0, outputs: 0x80, maxStackIncrease: 1}},
 		[][]byte{common.Hex2Bytes("604200")},
 		[]*Container{subcontainer},
 		[]byte{0x01, 0x02, 0x03},
