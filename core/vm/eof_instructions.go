@@ -24,7 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
 
@@ -126,9 +125,9 @@ func opEOFCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	var (
 		idx          = scope.Contract.Code[*pc+1]
-		value        = scope.Stack.pop()
 		salt         = scope.Stack.pop()
 		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		value        = scope.Stack.pop()
 		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
 	)
 	if int(idx) >= len(scope.Contract.Container.subContainerOffsets)-1 {
@@ -136,18 +135,12 @@ func opEOFCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	subContainer := scope.Contract.Container.subContainerAt(int(idx))
 
-	// Deduct hashing charge
-	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
-	hashingCharge := (params.Keccak256WordGas) * ((uint64(len(subContainer)) + 31) / 32)
-	if ok := scope.Contract.UseGas(hashingCharge, interpreter.evm.Config.Tracer, tracing.GasChangeUnspecified); !ok {
-		return nil, ErrGasUintOverflow
-	}
 	if interpreter.evm.Config.Tracer != nil {
-		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(EOFCREATE), 0, hashingCharge, scope, interpreter.returnData, interpreter.evm.depth, nil)
+		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(EOFCREATE), 0, 0, scope, interpreter.returnData, interpreter.evm.depth, nil)
 	}
 	gas := scope.Contract.Gas
 	// Reuse last popped value from stack
-	stackvalue := size
+	stackvalue := value
 	// Apply EIP150
 	gas -= gas / 64
 	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation2)

@@ -605,7 +605,7 @@ func (evm *EVM) Create2(caller common.Address, code []byte, gas uint64, endowmen
 
 // EOFCreate creates a new eof contract.
 func (evm *EVM) EOFCreate(caller common.Address, input []byte, subcontainer []byte, gas uint64, endowment *uint256.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
-	contractAddr = crypto.CreateAddress2(caller, salt.Bytes32(), crypto.Keccak256(subcontainer))
+	contractAddr = crypto.CreateAddress3(caller, salt.Bytes32())
 	return evm.create(caller, subcontainer, gas, endowment, contractAddr, EOFCREATE, input, true)
 }
 
