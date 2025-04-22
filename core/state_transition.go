@@ -157,6 +157,7 @@ type Message struct {
 	BlobGasFeeCap         *big.Int
 	BlobHashes            []common.Hash
 	SetCodeAuthorizations []types.SetCodeAuthorization
+	Initcodes             [][]byte
 
 	// When SkipNonceChecks is true, the message nonce is not checked against the
 	// account nonce in state.
@@ -184,6 +185,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipFromEOACheck:      false,
 		BlobHashes:            tx.BlobHashes(),
 		BlobGasFeeCap:         tx.BlobGasFeeCap(),
+		Initcodes:             tx.Initcodes(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -442,6 +444,18 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		floorDataGas, err = FloorDataGas(msg.Data)
 		if err != nil {
 			return nil, err
+		}
+		if msg.GasLimit < floorDataGas {
+			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)
+		}
+	}
+	if rules.IsOsaka {
+		for _, initcode := range st.evm.Initcodes {
+			initGas, err := FloorDataGas(initcode)
+			if err != nil {
+				return nil, err
+			}
+			floorDataGas += initGas - params.TxGas
 		}
 		if msg.GasLimit < floorDataGas {
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)

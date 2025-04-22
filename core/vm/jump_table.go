@@ -63,6 +63,7 @@ var (
 	verkleInstructionSet           = newVerkleInstructionSet()
 	pragueInstructionSet           = newPragueInstructionSet()
 	eofInstructionSet              = newEOFInstructionSetForTesting()
+	osakaInstructionSet            = newOsakaInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -89,6 +90,19 @@ func validate(jt JumpTable) JumpTable {
 func newVerkleInstructionSet() JumpTable {
 	instructionSet := newCancunInstructionSet()
 	enable4762(&instructionSet)
+	return validate(instructionSet)
+}
+
+func newOsakaInstructionSet() JumpTable {
+	instructionSet := newPragueInstructionSet()
+	instructionSet[TXCREATE] = &operation{
+		execute:     opTxCreate,
+		constantGas: params.Create2Gas,
+		dynamicGas:  gasEOFCreate,
+		minStack:    minStack(5, 1),
+		maxStack:    maxStack(5, 1),
+		memorySize:  memoryTxCreate,
+	}
 	return validate(instructionSet)
 }
 

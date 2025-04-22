@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -90,6 +91,15 @@ func NewEVMTxContext(msg *Message) vm.TxContext {
 	}
 	if msg.BlobGasFeeCap != nil {
 		ctx.BlobFeeCap = new(big.Int).Set(msg.BlobGasFeeCap)
+	}
+	if msg.Initcodes != nil {
+		ctx.Initcodes = make([][]byte, 0, len(msg.Initcodes))
+		ctx.InitcodeLookup = make(map[common.Hash][]byte)
+		state := crypto.NewKeccakState()
+		for _, code := range msg.Initcodes {
+			ctx.Initcodes = append(ctx.Initcodes, code)
+			ctx.InitcodeLookup[crypto.HashData(state, code)] = code
+		}
 	}
 	return ctx
 }

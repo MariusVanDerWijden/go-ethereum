@@ -163,6 +163,52 @@ func opEOFCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	return nil, nil
 }
 
+// opTxCreate implements the TXCREATE opcode
+func opTxCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
+	}
+	var (
+		initcodeHash = scope.Stack.pop()
+		salt         = scope.Stack.pop()
+		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		value        = scope.Stack.pop()
+		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
+
+		// Reuse last popped value from stack
+		stackvalue = value
+	)
+	subContainer, ok := interpreter.evm.InitcodeLookup[initcodeHash.Bytes32()]
+	if !ok {
+		stackvalue.Clear()
+		scope.Stack.push(&stackvalue)
+		return nil, nil
+	}
+
+	if interpreter.evm.Config.Tracer != nil {
+		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(TXCREATE), 0, 0, scope, interpreter.returnData, interpreter.evm.depth, nil)
+	}
+	gas := scope.Contract.Gas
+	// Apply EIP150
+	gas -= gas / 64
+	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation2)
+	res, addr, returnGas, suberr := interpreter.evm.TxCreate(scope.Contract.Address(), input, subContainer, gas, &value, &salt)
+	if suberr != nil {
+		stackvalue.Clear()
+	} else {
+		stackvalue.SetBytes(addr.Bytes())
+	}
+	scope.Stack.push(&stackvalue)
+	scope.Contract.RefundGas(returnGas, interpreter.evm.Config.Tracer, tracing.GasChangeCallLeftOverRefunded)
+
+	if suberr == ErrExecutionReverted {
+		interpreter.returnData = res // set REVERT data to return data buffer
+		return res, nil
+	}
+	interpreter.returnData = nil // clear dirty return data buffer
+	return nil, nil
+}
+
 // opReturnContract implements the RETURNCONTRACT opcode
 func opReturnContract(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	if !scope.InitCodeMode {

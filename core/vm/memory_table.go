@@ -133,6 +133,10 @@ func memoryEOFCreate(stack *Stack) (uint64, bool) {
 	return calcMemSize64(stack.Back(1), stack.Back(2))
 }
 
+func memoryTxCreate(stack *Stack) (uint64, bool) {
+	return calcMemSize64(stack.Back(2), stack.Back(3))
+}
+
 func memoryReturnContract(stack *Stack) (uint64, bool) {
 	return calcMemSize64(stack.Back(0), stack.Back(1))
 }

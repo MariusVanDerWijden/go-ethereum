@@ -619,6 +619,14 @@ func enableEOF(jt *JumpTable) {
 		maxStack:    maxStack(4, 1),
 		memorySize:  memoryEOFCreate,
 	}
+	jt[TXCREATE] = &operation{
+		execute:     opTxCreate,
+		constantGas: params.Create2Gas,
+		dynamicGas:  gasEOFCreate,
+		minStack:    minStack(5, 1),
+		maxStack:    maxStack(5, 1),
+		memorySize:  memoryTxCreate,
+	}
 	jt[RETURNCONTRACT] = &operation{
 		execute: opReturnContract,
 		// returncontract has zero constant gas cost

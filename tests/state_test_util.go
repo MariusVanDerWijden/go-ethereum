@@ -118,6 +118,7 @@ type stTransaction struct {
 	To                   string              `json:"to"`
 	Data                 []string            `json:"data"`
 	AccessLists          []*types.AccessList `json:"accessLists,omitempty"`
+	Initcodes            [][]byte            `json:"initcodes,omitempty"`
 	GasLimit             []uint64            `json:"gasLimit"`
 	Value                []string            `json:"value"`
 	PrivateKey           []byte              `json:"secretKey"`
@@ -135,6 +136,7 @@ type stTransactionMarshaling struct {
 	GasLimit             []math.HexOrDecimal64
 	PrivateKey           hexutil.Bytes
 	BlobGasFeeCap        *math.HexOrDecimal256
+	Initcodes            []hexutil.Bytes
 }
 
 //go:generate go run github.com/fjl/gencodec -type stAuthorization -field-override stAuthorizationMarshaling -out gen_stauthorization.go
@@ -477,6 +479,7 @@ func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (*core.Mess
 		BlobHashes:            tx.BlobVersionedHashes,
 		BlobGasFeeCap:         tx.BlobGasFeeCap,
 		SetCodeAuthorizations: authList,
+		Initcodes:             tx.Initcodes,
 	}
 	return msg, nil
 }

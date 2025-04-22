@@ -73,11 +73,13 @@ type BlockContext struct {
 // All fields can change between transactions.
 type TxContext struct {
 	// Message information
-	Origin       common.Address      // Provides information for ORIGIN
-	GasPrice     *big.Int            // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
-	BlobHashes   []common.Hash       // Provides information for BLOBHASH
-	BlobFeeCap   *big.Int            // Is used to zero the blobbasefee if NoBaseFee is set
-	AccessEvents *state.AccessEvents // Capture all state accesses for this tx
+	Origin         common.Address         // Provides information for ORIGIN
+	GasPrice       *big.Int               // Provides information for GASPRICE (and is used to zero the basefee if NoBaseFee is set)
+	BlobHashes     []common.Hash          // Provides information for BLOBHASH
+	BlobFeeCap     *big.Int               // Is used to zero the blobbasefee if NoBaseFee is set
+	AccessEvents   *state.AccessEvents    // Capture all state accesses for this tx
+	Initcodes      [][]byte               // Available initcodes for EOF create transactions
+	InitcodeLookup map[common.Hash][]byte // Available initcodes for EOF create transactions
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -607,6 +609,12 @@ func (evm *EVM) Create2(caller common.Address, code []byte, gas uint64, endowmen
 func (evm *EVM) EOFCreate(caller common.Address, input []byte, subcontainer []byte, gas uint64, endowment *uint256.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress3(caller, salt.Bytes32())
 	return evm.create(caller, subcontainer, gas, endowment, contractAddr, EOFCREATE, input, true)
+}
+
+// TxCreate creates a new eof contract.
+func (evm *EVM) TxCreate(caller common.Address, input []byte, subcontainer []byte, gas uint64, endowment *uint256.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+	contractAddr = crypto.CreateAddress3(caller, salt.Bytes32())
+	return evm.create(caller, subcontainer, gas, endowment, contractAddr, TXCREATE, input, true)
 }
 
 // resolveCode returns the code associated with the provided account. After
