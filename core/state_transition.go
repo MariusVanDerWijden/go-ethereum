@@ -132,6 +132,21 @@ func FloorDataGas(data []byte) (uint64, error) {
 	return params.TxGas + tokens*params.TxCostFloorPerToken, nil
 }
 
+// InitCodeGas computes the gas needed for the initcodes, both for the floor and normal gas.
+func InitCodeGas(data []byte) (uint64, uint64, error) {
+	var (
+		z      = uint64(bytes.Count(data, []byte{0}))
+		nz     = uint64(len(data)) - z
+		tokens = nz*params.TxTokenPerNonZeroByte + z
+	)
+	// Check for overflow, only needs to check TxCostFloorPerToken since its > TxTokenPerNonZeroByte
+	if (math.MaxUint64-params.TxGas)/params.TxCostFloorPerToken < tokens {
+		return 0, 0, ErrGasUintOverflow
+	}
+
+	return params.TxCostFloorPerToken * tokens, params.TxTokenPerNonZeroByte * tokens, nil
+}
+
 // toWordSize returns the ceiled word size required for init code payment calculation.
 func toWordSize(size uint64) uint64 {
 	if size > math.MaxUint64-31 {
@@ -451,11 +466,15 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	}
 	if rules.IsOsaka {
 		for _, initcode := range st.evm.Initcodes {
-			initGas, err := FloorDataGas(initcode)
+			floorGas, initGas, err := InitCodeGas(initcode)
 			if err != nil {
 				return nil, err
 			}
-			floorDataGas += initGas - params.TxGas
+			gas += initGas
+			floorDataGas += floorGas
+		}
+		if msg.GasLimit < gas {
+			return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 		}
 		if msg.GasLimit < floorDataGas {
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)
