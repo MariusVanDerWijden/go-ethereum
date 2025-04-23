@@ -153,9 +153,9 @@ func gasEip2929AccountCheck(evm *EVM, contract *Contract, stack *Stack, mem *Mem
 	return 0, nil
 }
 
-func makeCallVariantGasCallEIP2929(oldCalculator gasFunc, addressPosition int) gasFunc {
+func makeCallVariantGasCallEIP2929(oldCalculator gasFunc) gasFunc {
 	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-		addr := common.Address(stack.Back(addressPosition).Bytes20())
+		addr := common.Address(stack.Back(1).Bytes20())
 		// Check slot presence in the access list
 		warmAccess := evm.StateDB.AddressInAccessList(addr)
 		// The WarmStorageReadCostEIP2929 (100) is already deducted in the form of a constant cost, so
@@ -193,10 +193,10 @@ func makeCallVariantGasCallEIP2929(oldCalculator gasFunc, addressPosition int) g
 }
 
 var (
-	gasCallEIP2929         = makeCallVariantGasCallEIP2929(gasCall, 1)
-	gasDelegateCallEIP2929 = makeCallVariantGasCallEIP2929(gasDelegateCall, 1)
-	gasStaticCallEIP2929   = makeCallVariantGasCallEIP2929(gasStaticCall, 1)
-	gasCallCodeEIP2929     = makeCallVariantGasCallEIP2929(gasCallCode, 1)
+	gasCallEIP2929         = makeCallVariantGasCallEIP2929(gasCall)
+	gasDelegateCallEIP2929 = makeCallVariantGasCallEIP2929(gasDelegateCall)
+	gasStaticCallEIP2929   = makeCallVariantGasCallEIP2929(gasStaticCall)
+	gasCallCodeEIP2929     = makeCallVariantGasCallEIP2929(gasCallCode)
 	gasSelfdestructEIP2929 = makeSelfdestructGasFn(true)
 	// gasSelfdestructEIP3529 implements the changes in EIP-3529 (no refunds)
 	gasSelfdestructEIP3529 = makeSelfdestructGasFn(false)
@@ -245,17 +245,17 @@ func makeSelfdestructGasFn(refundsEnabled bool) gasFunc {
 }
 
 var (
-	gasCallEIP7702         = makeCallVariantGasCallEIP7702(gasCall)
-	gasDelegateCallEIP7702 = makeCallVariantGasCallEIP7702(gasDelegateCall)
-	gasStaticCallEIP7702   = makeCallVariantGasCallEIP7702(gasStaticCall)
-	gasCallCodeEIP7702     = makeCallVariantGasCallEIP7702(gasCallCode)
+	gasCallEIP7702         = makeCallVariantGasCallEIP7702(gasCall, 1)
+	gasDelegateCallEIP7702 = makeCallVariantGasCallEIP7702(gasDelegateCall, 1)
+	gasStaticCallEIP7702   = makeCallVariantGasCallEIP7702(gasStaticCall, 1)
+	gasCallCodeEIP7702     = makeCallVariantGasCallEIP7702(gasCallCode, 1)
 )
 
-func makeCallVariantGasCallEIP7702(oldCalculator gasFunc) gasFunc {
+func makeCallVariantGasCallEIP7702(oldCalculator gasFunc, addressPosition int) gasFunc {
 	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 		var (
 			total uint64 // total dynamic gas used
-			addr  = common.Address(stack.Back(1).Bytes20())
+			addr  = common.Address(stack.Back(addressPosition).Bytes20())
 		)
 
 		// Check slot presence in the access list
