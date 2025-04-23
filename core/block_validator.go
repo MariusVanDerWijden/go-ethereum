@@ -92,6 +92,12 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			return fmt.Errorf("unexpected blob sidecar in transaction at index %d", i)
 		}
 
+		// TODO (MariusVanDerWijden): this is pretty awkward
+		if tx.Type() != types.CreateTxType {
+			if tx.To() == nil && len(tx.Data()) >= 2 && tx.Data()[0] == 0xef && tx.Data()[0] == 00 {
+				return fmt.Errorf("invalid transaction, create tx with 0xef00")
+			}
+		}
 		// The individual checks for blob validity (version-check + not empty)
 		// happens in state transition.
 	}

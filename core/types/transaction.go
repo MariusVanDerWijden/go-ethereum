@@ -49,6 +49,7 @@ const (
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
 	SetCodeTxType    = 0x04
+	CreateTxType     = 0x06
 )
 
 // Transaction is an Ethereum transaction.
@@ -211,6 +212,8 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(BlobTx)
 	case SetCodeTxType:
 		inner = new(SetCodeTx)
+	case CreateTxType:
+		inner = new(CreateTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
@@ -507,6 +510,14 @@ func (tx *Transaction) SetCodeAuthorities() []common.Address {
 		}
 	}
 	return auths
+}
+
+func (tx *Transaction) Initcodes() [][]byte {
+	createTx, ok := tx.inner.(*CreateTx)
+	if !ok {
+		return nil
+	}
+	return createTx.Initcodes
 }
 
 // SetTime sets the decoding time of a transaction. This is used by tests to set

@@ -132,6 +132,21 @@ func FloorDataGas(data []byte) (uint64, error) {
 	return params.TxGas + tokens*params.TxCostFloorPerToken, nil
 }
 
+// InitCodeGas computes the gas needed for the initcodes, both for the floor and normal gas.
+func InitCodeGas(data []byte) (uint64, uint64, error) {
+	var (
+		z      = uint64(bytes.Count(data, []byte{0}))
+		nz     = uint64(len(data)) - z
+		tokens = nz*params.TxTokenPerNonZeroByte + z
+	)
+	// Check for overflow, only needs to check TxCostFloorPerToken since its > TxTokenPerNonZeroByte
+	if (math.MaxUint64-params.TxGas)/params.TxCostFloorPerToken < tokens {
+		return 0, 0, ErrGasUintOverflow
+	}
+
+	return params.TxCostFloorPerToken * tokens, params.TxTokenPerNonZeroByte * tokens, nil
+}
+
 // toWordSize returns the ceiled word size required for init code payment calculation.
 func toWordSize(size uint64) uint64 {
 	if size > math.MaxUint64-31 {
@@ -157,6 +172,7 @@ type Message struct {
 	BlobGasFeeCap         *big.Int
 	BlobHashes            []common.Hash
 	SetCodeAuthorizations []types.SetCodeAuthorization
+	Initcodes             [][]byte
 
 	// When SkipNonceChecks is true, the message nonce is not checked against the
 	// account nonce in state.
@@ -184,6 +200,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipFromEOACheck:      false,
 		BlobHashes:            tx.BlobHashes(),
 		BlobGasFeeCap:         tx.BlobGasFeeCap(),
+		Initcodes:             tx.Initcodes(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -442,6 +459,22 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		floorDataGas, err = FloorDataGas(msg.Data)
 		if err != nil {
 			return nil, err
+		}
+		if msg.GasLimit < floorDataGas {
+			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)
+		}
+	}
+	if rules.IsOsaka {
+		for _, initcode := range st.evm.Initcodes {
+			floorGas, initGas, err := InitCodeGas(initcode)
+			if err != nil {
+				return nil, err
+			}
+			gas += initGas
+			floorDataGas += floorGas
+		}
+		if msg.GasLimit < gas {
+			return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gasRemaining, gas)
 		}
 		if msg.GasLimit < floorDataGas {
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrFloorDataGas, msg.GasLimit, floorDataGas)

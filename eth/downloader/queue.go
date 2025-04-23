@@ -831,6 +831,13 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListH
 					return errInvalidBody
 				}
 			}
+
+			// TODO (MariusVanDerWijden): this is pretty awkward
+			if tx.Type() != types.CreateTxType {
+				if tx.To() == nil && len(tx.Data()) >= 2 && tx.Data()[0] == 0xef && tx.Data()[0] == 00 {
+					return errInvalidBody
+				}
+			}
 		}
 		if header.BlobGasUsed != nil {
 			if want := *header.BlobGasUsed / params.BlobTxBlobGasPerBlob; uint64(blobs) != want { // div because the header is surely good vs the body might be bloated

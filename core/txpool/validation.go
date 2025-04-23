@@ -82,6 +82,9 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if !rules.IsPrague && tx.Type() == types.SetCodeTxType {
 		return fmt.Errorf("%w: type %d rejected, pool not yet in Prague", core.ErrTxTypeNotSupported, tx.Type())
 	}
+	if !rules.IsOsaka && tx.Type() == types.CreateTxType {
+		return fmt.Errorf("%w: type %d rejected, pool not yet in Osaka", core.ErrTxTypeNotSupported, tx.Type())
+	}
 	// Check whether the init code size has been exceeded
 	if rules.IsShanghai && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
 		return fmt.Errorf("%w: code size %v, limit %v", core.ErrMaxInitCodeSizeExceeded, len(tx.Data()), params.MaxInitCodeSize)
@@ -160,6 +163,13 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if tx.Type() == types.SetCodeTxType {
 		if len(tx.SetCodeAuthorizations()) == 0 {
 			return fmt.Errorf("set code tx must have at least one authorization tuple")
+		}
+	}
+
+	// TODO (MariusVanDerWijden): this is pretty awkward
+	if tx.Type() != types.CreateTxType {
+		if tx.To() == nil && len(tx.Data()) >= 2 && tx.Data()[0] == 0xef && tx.Data()[0] == 00 {
+			return fmt.Errorf("invalid tx")
 		}
 	}
 	return nil

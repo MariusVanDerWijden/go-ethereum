@@ -35,7 +35,9 @@ const (
 	kindTypes     = 1
 	kindCode      = 2
 	kindContainer = 3
-	kindData      = 4
+	kindData      = 0xff
+
+	containerSizeLength = 4 // Size of container_size, 4 byte
 
 	eofFormatByte = 0xef
 	eof1Version   = 1
@@ -76,9 +78,9 @@ type Container struct {
 
 // functionMetadata is an EOF function signature.
 type functionMetadata struct {
-	inputs         uint8
-	outputs        uint8
-	maxStackHeight uint16
+	inputs           uint8
+	outputs          uint8
+	maxStackIncrease uint16
 }
 
 // stackDelta returns the #outputs - #inputs
@@ -98,7 +100,7 @@ func (meta *functionMetadata) checkInputs(stackMin int) error {
 // checkStackMax checks the if current maximum stack combined with the
 // function max stack will result in a stack overflow, and if so returns an error.
 func (meta *functionMetadata) checkStackMax(stackMax int) error {
-	newMaxStack := stackMax + int(meta.maxStackHeight) - int(meta.inputs)
+	newMaxStack := stackMax + int(meta.maxStackIncrease)
 	if newMaxStack > int(params.StackLimit) {
 		return ErrStackOverflow{stackLen: newMaxStack, limit: int(params.StackLimit)}
 	}
@@ -162,7 +164,7 @@ func (c *Container) MarshalBinary() []byte {
 		b = binary.BigEndian.AppendUint16(b, uint16(len(c.subContainers)))
 		for _, section := range c.subContainers {
 			encoded := section.MarshalBinary()
-			b = binary.BigEndian.AppendUint16(b, uint16(len(encoded)))
+			b = binary.BigEndian.AppendUint32(b, uint32(len(encoded)))
 			encodedContainer = append(encodedContainer, encoded)
 		}
 	}
@@ -172,7 +174,7 @@ func (c *Container) MarshalBinary() []byte {
 
 	// Write section contents.
 	for _, ty := range c.types {
-		b = append(b, []byte{ty.inputs, ty.outputs, byte(ty.maxStackHeight >> 8), byte(ty.maxStackHeight & 0x00ff)}...)
+		b = append(b, []byte{ty.inputs, ty.outputs, byte(ty.maxStackIncrease >> 8), byte(ty.maxStackIncrease & 0x00ff)}...)
 	}
 	for s := range codeSectionOffsets {
 		b = append(b, c.codeSectionAt(s)...)
@@ -246,7 +248,7 @@ func (c *Container) unmarshalContainer(b []byte, isInitcode bool, topLevel bool)
 	var containerSizes []int
 	offset := offsetCodeKind + 2 + 2*len(codeSizes) + 1
 	if offset < len(b) && b[offset] == kindContainer {
-		kind, containerSizes, err = parseSectionList(b, offset)
+		kind, containerSizes, err = parseContainerSectionList(b, offset)
 		if err != nil {
 			return err
 		}
@@ -256,7 +258,7 @@ func (c *Container) unmarshalContainer(b []byte, isInitcode bool, topLevel bool)
 		if len(containerSizes) == 0 {
 			return fmt.Errorf("%w: total container count must not be zero", errInvalidContainerSectionSize)
 		}
-		offset = offset + 2 + 2*len(containerSizes) + 1
+		offset = offset + 2 + containerSizeLength*len(containerSizes) + 1
 	}
 
 	// Parse data section header.
@@ -296,9 +298,9 @@ func (c *Container) unmarshalContainer(b []byte, isInitcode bool, topLevel bool)
 	var types = make([]*functionMetadata, 0, typesSize/4)
 	for i := 0; i < typesSize/4; i++ {
 		sig := &functionMetadata{
-			inputs:         b[idx+i*4],
-			outputs:        b[idx+i*4+1],
-			maxStackHeight: binary.BigEndian.Uint16(b[idx+i*4+2:]),
+			inputs:           b[idx+i*4],
+			outputs:          b[idx+i*4+1],
+			maxStackIncrease: binary.BigEndian.Uint16(b[idx+i*4+2:]),
 		}
 		if sig.inputs > maxInputItems {
 			return fmt.Errorf("%w for section %d: have %d", errTooManyInputs, i, sig.inputs)
@@ -306,8 +308,8 @@ func (c *Container) unmarshalContainer(b []byte, isInitcode bool, topLevel bool)
 		if sig.outputs > maxOutputItems {
 			return fmt.Errorf("%w for section %d: have %d", errTooManyOutputs, i, sig.outputs)
 		}
-		if sig.maxStackHeight > maxStackHeight {
-			return fmt.Errorf("%w for section %d: have %d", errTooLargeMaxStackHeight, i, sig.maxStackHeight)
+		if sig.maxStackIncrease > maxStackHeight {
+			return fmt.Errorf("%w for section %d: have %d", errTooLargeMaxStackHeight, i, sig.maxStackIncrease)
 		}
 		types = append(types, sig)
 	}
@@ -461,7 +463,7 @@ func parseSectionList(b []byte, idx int) (kind int, list []int, err error) {
 	return kind, list, nil
 }
 
-// parseList decodes a list of uint16..
+// parseList decodes a list of uint16.
 func parseList(b []byte, idx int) ([]int, error) {
 	if len(b) < idx+2 {
 		return nil, io.ErrUnexpectedEOF
@@ -473,6 +475,36 @@ func parseList(b []byte, idx int) ([]int, error) {
 	list := make([]int, count)
 	for i := 0; i < int(count); i++ {
 		list[i] = int(binary.BigEndian.Uint16(b[idx+2+2*i:]))
+	}
+	return list, nil
+}
+
+// parseContainerSectionList decodes a (kind, len, []codeSize) section list from an EOF
+// header.
+func parseContainerSectionList(b []byte, idx int) (kind int, list []int, err error) {
+	if idx >= len(b) {
+		return 0, nil, io.ErrUnexpectedEOF
+	}
+	kind = int(b[idx])
+	list, err = parseContainerList(b, idx+1)
+	if err != nil {
+		return 0, nil, err
+	}
+	return kind, list, nil
+}
+
+// parseContainerList decodes a list of uint16 with length uint32.
+func parseContainerList(b []byte, idx int) ([]int, error) {
+	if len(b) < idx+2 {
+		return nil, io.ErrUnexpectedEOF
+	}
+	count := binary.BigEndian.Uint16(b[idx:])
+	if len(b) <= idx+2+int(count)*containerSizeLength {
+		return nil, io.ErrUnexpectedEOF
+	}
+	list := make([]int, count)
+	for i := range int(count) {
+		list[i] = int(binary.BigEndian.Uint32(b[idx+2+containerSizeLength*i:]))
 	}
 	return list, nil
 }
@@ -524,7 +556,7 @@ func (c *Container) String() string {
 	output = append(output, "Body")
 	for i, typ := range c.types {
 		output = append(output, fmt.Sprintf("  - Type %v: %x", i,
-			[]byte{typ.inputs, typ.outputs, byte(typ.maxStackHeight >> 8), byte(typ.maxStackHeight & 0x00ff)}))
+			[]byte{typ.inputs, typ.outputs, byte(typ.maxStackIncrease >> 8), byte(typ.maxStackIncrease & 0x00ff)}))
 	}
 	for i := range codeSectionOffsets {
 		output = append(output, fmt.Sprintf("  - Code section %d: %#x", i, c.codeSectionAt(i)))

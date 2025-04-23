@@ -24,7 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
 
@@ -75,7 +74,7 @@ func opCallf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 		idx = binary.BigEndian.Uint16(scope.Contract.Code[*pc+1:])
 		typ = scope.Contract.Container.types[idx]
 	)
-	if scope.Stack.len()+int(typ.maxStackHeight)-int(typ.inputs) > 1024 {
+	if scope.Stack.len()+int(typ.maxStackIncrease) > 1024 {
 		return nil, fmt.Errorf("stack overflow")
 	}
 	if scope.ReturnStack.Len() > 1024 {
@@ -111,7 +110,7 @@ func opJumpf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 		idx = binary.BigEndian.Uint16(scope.Contract.Code[*pc+1:])
 		typ = scope.Contract.Container.types[idx]
 	)
-	if scope.Stack.len()+int(typ.maxStackHeight)-int(typ.inputs) > 1024 {
+	if scope.Stack.len()+int(typ.maxStackIncrease) > 1024 {
 		return nil, fmt.Errorf("stack overflow")
 	}
 	scope.CodeSection = uint64(idx)
@@ -126,9 +125,9 @@ func opEOFCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	var (
 		idx          = scope.Contract.Code[*pc+1]
-		value        = scope.Stack.pop()
 		salt         = scope.Stack.pop()
 		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		value        = scope.Stack.pop()
 		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
 	)
 	if int(idx) >= len(scope.Contract.Container.subContainerOffsets)-1 {
@@ -136,24 +135,64 @@ func opEOFCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) (
 	}
 	subContainer := scope.Contract.Container.subContainerAt(int(idx))
 
-	// Deduct hashing charge
-	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
-	hashingCharge := (params.Keccak256WordGas) * ((uint64(len(subContainer)) + 31) / 32)
-	if ok := scope.Contract.UseGas(hashingCharge, interpreter.evm.Config.Tracer, tracing.GasChangeUnspecified); !ok {
-		return nil, ErrGasUintOverflow
-	}
 	if interpreter.evm.Config.Tracer != nil {
-		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(EOFCREATE), 0, hashingCharge, scope, interpreter.returnData, interpreter.evm.depth, nil)
+		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(EOFCREATE), 0, 0, scope, interpreter.returnData, interpreter.evm.depth, nil)
 	}
 	gas := scope.Contract.Gas
 	// Reuse last popped value from stack
-	stackvalue := size
+	stackvalue := value
 	// Apply EIP150
 	gas -= gas / 64
 	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation2)
 	// Skip the immediate
 	*pc += 1
 	res, addr, returnGas, suberr := interpreter.evm.EOFCreate(scope.Contract.Address(), input, subContainer, gas, &value, &salt)
+	if suberr != nil {
+		stackvalue.Clear()
+	} else {
+		stackvalue.SetBytes(addr.Bytes())
+	}
+	scope.Stack.push(&stackvalue)
+	scope.Contract.RefundGas(returnGas, interpreter.evm.Config.Tracer, tracing.GasChangeCallLeftOverRefunded)
+
+	if suberr == ErrExecutionReverted {
+		interpreter.returnData = res // set REVERT data to return data buffer
+		return res, nil
+	}
+	interpreter.returnData = nil // clear dirty return data buffer
+	return nil, nil
+}
+
+// opTxCreate implements the TXCREATE opcode
+func opTxCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
+	}
+	var (
+		initcodeHash = scope.Stack.pop()
+		salt         = scope.Stack.pop()
+		offset, size = scope.Stack.pop(), scope.Stack.pop()
+		value        = scope.Stack.pop()
+		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
+
+		// Reuse last popped value from stack
+		stackvalue = value
+	)
+	subContainer, ok := interpreter.evm.InitcodeLookup[initcodeHash.Bytes32()]
+	if !ok {
+		stackvalue.Clear()
+		scope.Stack.push(&stackvalue)
+		return nil, nil
+	}
+
+	if interpreter.evm.Config.Tracer != nil {
+		interpreter.evm.Config.Tracer.OnOpcode(*pc, byte(TXCREATE), 0, 0, scope, interpreter.returnData, interpreter.evm.depth, nil)
+	}
+	gas := scope.Contract.Gas
+	// Apply EIP150
+	gas -= gas / 64
+	scope.Contract.UseGas(gas, interpreter.evm.Config.Tracer, tracing.GasChangeCallContractCreation2)
+	res, addr, returnGas, suberr := interpreter.evm.TxCreate(scope.Contract.Address(), input, subContainer, gas, &value, &salt)
 	if suberr != nil {
 		stackvalue.Clear()
 	} else {
@@ -384,7 +423,7 @@ func opExtDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCont
 		ret       []byte
 		returnGas uint64
 	)
-	code := interpreter.evm.StateDB.GetCode(toAddr)
+	code := interpreter.evm.resolveCode(toAddr)
 	if !HasEOFMagic(code) {
 		// Delegate-calling a non-eof contract should return 1
 		err = ErrExecutionReverted

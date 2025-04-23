@@ -24,6 +24,7 @@ func (s stTransaction) MarshalJSON() ([]byte, error) {
 		To                   string                `json:"to"`
 		Data                 []string              `json:"data"`
 		AccessLists          []*types.AccessList   `json:"accessLists,omitempty"`
+		Initcodes            []hexutil.Bytes       `json:"initcodes,omitempty"`
 		GasLimit             []math.HexOrDecimal64 `json:"gasLimit"`
 		Value                []string              `json:"value"`
 		PrivateKey           hexutil.Bytes         `json:"secretKey"`
@@ -40,6 +41,12 @@ func (s stTransaction) MarshalJSON() ([]byte, error) {
 	enc.To = s.To
 	enc.Data = s.Data
 	enc.AccessLists = s.AccessLists
+	if s.Initcodes != nil {
+		enc.Initcodes = make([]hexutil.Bytes, len(s.Initcodes))
+		for k, v := range s.Initcodes {
+			enc.Initcodes[k] = v
+		}
+	}
 	if s.GasLimit != nil {
 		enc.GasLimit = make([]math.HexOrDecimal64, len(s.GasLimit))
 		for k, v := range s.GasLimit {
@@ -65,6 +72,7 @@ func (s *stTransaction) UnmarshalJSON(input []byte) error {
 		To                   *string               `json:"to"`
 		Data                 []string              `json:"data"`
 		AccessLists          []*types.AccessList   `json:"accessLists,omitempty"`
+		Initcodes            []hexutil.Bytes       `json:"initcodes,omitempty"`
 		GasLimit             []math.HexOrDecimal64 `json:"gasLimit"`
 		Value                []string              `json:"value"`
 		PrivateKey           *hexutil.Bytes        `json:"secretKey"`
@@ -97,6 +105,12 @@ func (s *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 	if dec.AccessLists != nil {
 		s.AccessLists = dec.AccessLists
+	}
+	if dec.Initcodes != nil {
+		s.Initcodes = make([][]byte, len(dec.Initcodes))
+		for k, v := range dec.Initcodes {
+			s.Initcodes[k] = v
+		}
 	}
 	if dec.GasLimit != nil {
 		s.GasLimit = make([]uint64, len(dec.GasLimit))
