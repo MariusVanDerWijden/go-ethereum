@@ -340,7 +340,7 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas, evm.Config.Tracer)
 	} else {
-		code := evm.StateDB.GetCode(addr)
+		code := evm.resolveCode(addr)
 		if fromEOF && !HasEOFMagic(code) {
 			return nil, gas, errors.New("extDelegateCall to non-eof contract")
 		}
