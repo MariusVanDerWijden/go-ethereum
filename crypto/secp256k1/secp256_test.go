@@ -12,6 +12,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -236,5 +237,57 @@ func BenchmarkRecover(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		RecoverPubkey(msg, sig)
+	}
+}
+
+func BenchmarkRecoverBatch(b *testing.B) {
+	msg := csprngEntropy(32)
+	_, seckey := generateKeyPair()
+	sig, _ := Sign(msg, seckey)
+
+	num := 10000
+	msgs := make([][]byte, num)
+	sigs := make([][]byte, num)
+	for i := range len(msgs) {
+		msgs[i] = msg
+		sigs[i] = sig
+	}
+
+	b.Run("single", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for i := range len(msgs) {
+				RecoverPubkey(msgs[i], sigs[i])
+			}
+		}
+	})
+
+	b.Run("multiple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			RecoverMultiplePubkeys(msgs, sigs)
+		}
+	})
+}
+
+func TestRecoverMultiple(t *testing.T) {
+	msg := csprngEntropy(32)
+	pubkey, seckey := generateKeyPair()
+	sig, _ := Sign(msg, seckey)
+
+	num := 2
+	msgs := make([][]byte, num)
+	sigs := make([][]byte, num)
+	for i := range len(msgs) {
+		msgs[i] = msg
+		sigs[i] = sig
+	}
+
+	pks, err := RecoverMultiplePubkeys(msgs, sigs)
+	if err != nil {
+		panic(err)
+	}
+	for idx, pk := range pks {
+		if !bytes.Equal(pk, pubkey) {
+			panic(fmt.Sprintf("error at %v pk %x != %x", idx, pk, pubkey))
+		}
 	}
 }

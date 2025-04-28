@@ -113,6 +113,50 @@ func RecoverPubkey(msg []byte, sig []byte) ([]byte, error) {
 	return pubkey, nil
 }
 
+func RecoverMultiplePubkeys(msgs [][]byte, sigs [][]byte) ([][]byte, error) {
+	const (
+		pkLen  = 65
+		msgLen = 32
+		sigLen = 65
+	)
+
+	if len(msgs) != len(sigs) {
+		panic("should never happen")
+	}
+
+	var (
+		input = make([]byte, len(msgs)*(sigLen+msgLen))
+	)
+	for i := range len(msgs) {
+		if len(sigs[i]) != sigLen {
+			panic("adfasdf")
+		}
+		if len(msgs[i]) != msgLen {
+			panic("adfasdf")
+		}
+		if err := checkSignature(sigs[i]); err != nil {
+			panic("adfasdf")
+		}
+		copy(input[i*sigLen:], sigs[i])
+		copy(input[len(sigs)*sigLen+i*msgLen:], msgs[i])
+	}
+
+	var (
+		sigdata   = (*C.uchar)(unsafe.Pointer(&input[0]))
+		msgdata   = (*C.uchar)(unsafe.Pointer(&input[len(msgs)*sigLen]))
+		pkPointer = (*C.uchar)(unsafe.Pointer(&input[0]))
+		count     = (C.uint)(uint32(len(msgs)))
+	)
+	if C.secp256k1_ext_ecdsa_recover_multiple(context, count, pkPointer, sigdata, msgdata) == 0 {
+		return [][]byte{}, ErrRecoverFailed
+	}
+	output := make([][]byte, 0, len(msgs))
+	for i := range len(msgs) {
+		output = append(output, input[i*pkLen:i*pkLen+pkLen])
+	}
+	return output, nil
+}
+
 // VerifySignature checks that the given pubkey created signature over message.
 // The signature should be in [R || S] format.
 func VerifySignature(pubkey, msg, signature []byte) bool {
