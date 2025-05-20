@@ -116,7 +116,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 			// This operation incurs significant memory allocations due to
 			// trie hashing and node decoding. TODO(rjl493456442): investigate
 			// ways to mitigate this overhead.
-			stateCpy.IntermediateRoot(true)
+			stateCpy.Finalise(true)
 			return nil
 		})
 	}
