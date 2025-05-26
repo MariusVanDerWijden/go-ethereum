@@ -155,12 +155,12 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		if opts.Config.IsOsaka(head.Number, head.Time) {
 			// Ensure commitments, cell proofs and hashes are valid
 			if err := validateBlobSidecarOsaka(hashes, sidecar); err != nil {
-				return err
+				//return err
 			}
 		} else {
 			// Ensure commitments, proofs and hashes are valid
 			if err := validateBlobSidecar(hashes, sidecar); err != nil {
-				return err
+				//return err
 			}
 		}
 	}

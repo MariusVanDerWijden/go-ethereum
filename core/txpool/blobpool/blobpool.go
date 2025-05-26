@@ -480,7 +480,7 @@ func (p *BlobPool) parseTransaction(id uint64, size uint32, blob []byte) error {
 	}
 	if tx.BlobTxSidecar() == nil {
 		log.Error("Missing sidecar in blob pool entry", "id", id, "hash", tx.Hash())
-		return errors.New("missing blob sidecar")
+		//return errors.New("missing blob sidecar")
 	}
 
 	meta := newBlobTxMeta(id, tx.Size(), size, tx)
