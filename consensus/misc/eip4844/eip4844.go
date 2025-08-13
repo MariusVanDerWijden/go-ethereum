@@ -72,7 +72,7 @@ func CalcExcessBlobGas(config *params.ChainConfig, parent, head *types.Header) u
 	}
 	var (
 		excessBlobGas = parentExcessBlobGas + parentBlobGasUsed
-		target        = targetBlobsPerBlock(config, head.Time)
+		target        = targetBlobsPerBlock(config, parent.Time)
 		targetGas     = uint64(target) * params.BlobTxBlobGasPerBlob
 	)
 	if excessBlobGas < targetGas {
@@ -90,7 +90,7 @@ func CalcExcessBlobGas(config *params.ChainConfig, parent, head *types.Header) u
 		blobPrice    = calcBlobPrice(config, parent, head)
 	)
 	if reservePrice.Cmp(blobPrice) > 0 {
-		max := MaxBlobsPerBlock(config, head.Time)
+		max := MaxBlobsPerBlock(config, parent.Time)
 		scaledExcess := parentBlobGasUsed * uint64(max-target) / uint64(max)
 		return parentExcessBlobGas + scaledExcess
 	}

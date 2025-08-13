@@ -96,6 +96,55 @@ func TestCalcBlobFee(t *testing.T) {
 	}
 }
 
+func TestCalcBlobFee2(t *testing.T) {
+	zero := uint64(0)
+	one := uint64(1)
+
+	tests := []struct {
+		excessBlobGas uint64
+		blobGasUsed   uint64
+		blobfee       uint64
+	}{
+		{5149252, 1310720, 5617366},
+	}
+	for i, tt := range tests {
+		config := &params.ChainConfig{
+			LondonBlock: big.NewInt(0),
+			CancunTime:  &zero,
+			PragueTime:  &zero,
+			OsakaTime:   &zero,
+			BPO1Time:    &zero,
+			BPO2Time:    &one,
+			BlobScheduleConfig: &params.BlobScheduleConfig{
+				Cancun: params.DefaultCancunBlobConfig,
+				Prague: params.DefaultPragueBlobConfig,
+				Osaka:  params.DefaultOsakaBlobConfig,
+				BPO1: &params.BlobConfig{
+					Target:         9,
+					Max:            14,
+					UpdateFraction: 8832827,
+				},
+				BPO2: &params.BlobConfig{
+					Target:         14,
+					Max:            21,
+					UpdateFraction: 13739630,
+				},
+			}}
+		parent := &types.Header{
+			ExcessBlobGas: &tt.excessBlobGas,
+			BlobGasUsed:   &tt.blobGasUsed,
+			BaseFee:       big.NewInt(30),
+		}
+		head := &types.Header{
+			Time: 1,
+		}
+		have := CalcExcessBlobGas(config, parent, head)
+		if have != tt.blobfee {
+			t.Errorf("test %d: blobfee mismatch: have %v want %v", i, have, tt.blobfee)
+		}
+	}
+}
+
 func TestFakeExponential(t *testing.T) {
 	tests := []struct {
 		factor      int64
