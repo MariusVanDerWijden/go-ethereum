@@ -52,7 +52,7 @@ func VerifyEIP4844Header(config *params.ChainConfig, parent, header *types.Heade
 		return fmt.Errorf("blob gas used %d not a multiple of blob gas per blob %d", header.BlobGasUsed, params.BlobTxBlobGasPerBlob)
 	}
 	// Verify the excessBlobGas is correct based on the parent header
-	expectedExcessBlobGas := CalcExcessBlobGas(config, parent, header.Time)
+	expectedExcessBlobGas := CalcExcessBlobGas(config, parent, header)
 	if *header.ExcessBlobGas != expectedExcessBlobGas {
 		return fmt.Errorf("invalid excessBlobGas: have %d, want %d", *header.ExcessBlobGas, expectedExcessBlobGas)
 	}
@@ -61,7 +61,7 @@ func VerifyEIP4844Header(config *params.ChainConfig, parent, header *types.Heade
 
 // CalcExcessBlobGas calculates the excess blob gas after applying the set of
 // blobs on top of the excess blob gas.
-func CalcExcessBlobGas(config *params.ChainConfig, parent *types.Header, headTimestamp uint64) uint64 {
+func CalcExcessBlobGas(config *params.ChainConfig, parent, head *types.Header) uint64 {
 	var (
 		parentExcessBlobGas uint64
 		parentBlobGasUsed   uint64
@@ -72,13 +72,13 @@ func CalcExcessBlobGas(config *params.ChainConfig, parent *types.Header, headTim
 	}
 	var (
 		excessBlobGas = parentExcessBlobGas + parentBlobGasUsed
-		target        = targetBlobsPerBlock(config, headTimestamp)
+		target        = targetBlobsPerBlock(config, head.Time)
 		targetGas     = uint64(target) * params.BlobTxBlobGasPerBlob
 	)
 	if excessBlobGas < targetGas {
 		return 0
 	}
-	if !config.IsOsaka(config.LondonBlock, headTimestamp) {
+	if !config.IsOsaka(config.LondonBlock, head.Time) {
 		// Pre-Osaka, we use the formula defined by EIP-4844.
 		return excessBlobGas - targetGas
 	}
@@ -87,10 +87,10 @@ func CalcExcessBlobGas(config *params.ChainConfig, parent *types.Header, headTim
 	var (
 		baseCost     = big.NewInt(params.BlobBaseCost)
 		reservePrice = baseCost.Mul(baseCost, parent.BaseFee)
-		blobPrice    = calcBlobPrice(config, parent)
+		blobPrice    = calcBlobPrice(config, head)
 	)
 	if reservePrice.Cmp(blobPrice) > 0 {
-		max := MaxBlobsPerBlock(config, headTimestamp)
+		max := MaxBlobsPerBlock(config, head.Time)
 		scaledExcess := parentBlobGasUsed * uint64(max-target) / uint64(max)
 		return parentExcessBlobGas + scaledExcess
 	}

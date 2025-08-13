@@ -225,7 +225,7 @@ func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header,
 	if sim.chainConfig.IsCancun(header.Number, header.Time) {
 		var excess uint64
 		if sim.chainConfig.IsCancun(parent.Number, parent.Time) {
-			excess = eip4844.CalcExcessBlobGas(sim.chainConfig, parent, header.Time)
+			excess = eip4844.CalcExcessBlobGas(sim.chainConfig, parent, header)
 		}
 		header.ExcessBlobGas = &excess
 	}
