@@ -87,7 +87,7 @@ func CalcExcessBlobGas(config *params.ChainConfig, parent, head *types.Header) u
 	var (
 		baseCost     = big.NewInt(params.BlobBaseCost)
 		reservePrice = baseCost.Mul(baseCost, parent.BaseFee)
-		blobPrice    = calcBlobPrice(config, head)
+		blobPrice    = calcBlobPrice(config, parent, head)
 	)
 	if reservePrice.Cmp(blobPrice) > 0 {
 		max := MaxBlobsPerBlock(config, head.Time)
@@ -104,6 +104,15 @@ func CalcBlobFee(config *params.ChainConfig, header *types.Header) *big.Int {
 		panic("calculating blob fee on unsupported fork")
 	}
 	return fakeExponential(minBlobGasPrice, new(big.Int).SetUint64(*header.ExcessBlobGas), new(big.Int).SetUint64(blobConfig.UpdateFraction))
+}
+
+// CalcBlobFee calculates the blobfee from the header's excess blob gas field.
+func CalcBlobFee2(config *params.ChainConfig, parent, header *types.Header) *big.Int {
+	blobConfig := latestBlobConfig(config, header.Time)
+	if blobConfig == nil {
+		panic("calculating blob fee on unsupported fork")
+	}
+	return fakeExponential(minBlobGasPrice, new(big.Int).SetUint64(*parent.ExcessBlobGas), new(big.Int).SetUint64(blobConfig.UpdateFraction))
 }
 
 // MaxBlobsPerBlock returns the max blobs per block for a block at the given timestamp.
@@ -206,7 +215,7 @@ func fakeExponential(factor, numerator, denominator *big.Int) *big.Int {
 }
 
 // calcBlobPrice calculates the blob price for a block.
-func calcBlobPrice(config *params.ChainConfig, header *types.Header) *big.Int {
-	blobBaseFee := CalcBlobFee(config, header)
+func calcBlobPrice(config *params.ChainConfig, parent, header *types.Header) *big.Int {
+	blobBaseFee := CalcBlobFee2(config, parent, header)
 	return new(big.Int).Mul(blobBaseFee, big.NewInt(params.BlobTxBlobGasPerBlob))
 }
