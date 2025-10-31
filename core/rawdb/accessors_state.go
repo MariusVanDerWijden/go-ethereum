@@ -27,7 +27,7 @@ import (
 
 // ReadPreimage retrieves a single preimage of the provided hash.
 func ReadPreimage(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	data, _ := db.Get(preimageKey(hash))
+	data, _ := Get(db, preimageKey(hash))
 	if len(data) == 0 {
 		preimageMissCounter.Inc(1)
 	} else {
@@ -39,7 +39,7 @@ func ReadPreimage(db ethdb.KeyValueReader, hash common.Hash) []byte {
 // WritePreimages writes the provided set of preimages to the database.
 func WritePreimages(db ethdb.KeyValueWriter, preimages map[common.Hash][]byte) {
 	for hash, preimage := range preimages {
-		if err := db.Put(preimageKey(hash), preimage); err != nil {
+		if err := Put(db, preimageKey(hash), preimage); err != nil {
 			log.Crit("Failed to store trie preimage", "err", err)
 		}
 	}
@@ -54,15 +54,20 @@ func ReadCode(db ethdb.KeyValueReader, hash common.Hash) []byte {
 	if len(data) != 0 {
 		return data
 	}
-	data, _ = db.Get(hash.Bytes())
+	data, _ = Get(db, hash.Bytes())
 	return data
 }
 
 // ReadCodeWithPrefix retrieves the contract code of the provided code hash.
 // The main difference between this function and ReadCode is this function
 // will only check the existence with latest scheme(with prefix).
+func ReadCodeWithPrefix2(db ethdb.KeyValueReader, hash common.Hash) []byte {
+	data, _ := Get(db, codeKey(hash))
+	return data
+}
+
 func ReadCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	data, _ := db.Get(codeKey(hash))
+	data, _ := Get(db, codeKey(hash))
 	return data
 }
 
@@ -87,8 +92,14 @@ func HasCodeWithPrefix(db ethdb.KeyValueReader, hash common.Hash) bool {
 }
 
 // WriteCode writes the provided contract code database.
-func WriteCode(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
+func WriteCode2(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
 	if err := db.Put(codeKey(hash), code); err != nil {
+		log.Crit("Failed to store contract code", "err", err)
+	}
+}
+
+func WriteCode(db ethdb.KeyValueWriter, hash common.Hash, code []byte) {
+	if err := Put(db, codeKey(hash), code); err != nil {
 		log.Crit("Failed to store contract code", "err", err)
 	}
 }
@@ -102,7 +113,7 @@ func DeleteCode(db ethdb.KeyValueWriter, hash common.Hash) {
 
 // ReadStateID retrieves the state id with the provided state root.
 func ReadStateID(db ethdb.KeyValueReader, root common.Hash) *uint64 {
-	data, err := db.Get(stateIDKey(root))
+	data, err := Get(db, stateIDKey(root))
 	if err != nil || len(data) == 0 {
 		return nil
 	}
@@ -121,7 +132,7 @@ func WriteStateID(db ethdb.KeyValueWriter, root common.Hash, id uint64) {
 
 // ReadPersistentStateID retrieves the id of the persistent state from the database.
 func ReadPersistentStateID(db ethdb.KeyValueReader) uint64 {
-	data, _ := db.Get(persistentStateIDKey)
+	data, _ := Get(db, persistentStateIDKey)
 	if len(data) != 8 {
 		return 0
 	}
@@ -138,7 +149,7 @@ func WritePersistentStateID(db ethdb.KeyValueWriter, number uint64) {
 // ReadTrieJournal retrieves the serialized in-memory trie nodes of layers saved at
 // the last shutdown.
 func ReadTrieJournal(db ethdb.KeyValueReader) []byte {
-	data, _ := db.Get(trieJournalKey)
+	data, _ := Get(db, trieJournalKey)
 	return data
 }
 

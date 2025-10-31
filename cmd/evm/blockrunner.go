@@ -27,6 +27,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/tests"
 	"github.com/urfave/cli/v2"
 )
@@ -100,5 +101,6 @@ func runBlockTest(ctx *cli.Context, fname string) ([]testResult, error) {
 		}
 		results = append(results, *result)
 	}
+	debug.Handler.WriteMemProfile(fmt.Sprintf("%v_mem.pprof", fname))
 	return results, nil
 }

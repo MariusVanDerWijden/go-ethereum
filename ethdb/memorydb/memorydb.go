@@ -148,14 +148,14 @@ func (db *Database) DeleteRange(start, end []byte) error {
 // NewBatch creates a write-only key-value store that buffers changes to its host
 // database until a final write is called.
 func (db *Database) NewBatch() ethdb.Batch {
-	return &batch{
+	return &Batch{
 		db: db,
 	}
 }
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
-	return &batch{
+	return &Batch{
 		db: db,
 	}
 }
@@ -234,30 +234,30 @@ type keyvalue struct {
 	rangeTo   []byte
 }
 
-// batch is a write-only memory batch that commits changes to its host
-// database when Write is called. A batch cannot be used concurrently.
-type batch struct {
+// Batch is a write-only memory Batch that commits changes to its host
+// database when Write is called. A Batch cannot be used concurrently.
+type Batch struct {
 	db     *Database
 	writes []keyvalue
 	size   int
 }
 
 // Put inserts the given value into the batch for later committing.
-func (b *batch) Put(key, value []byte) error {
+func (b *Batch) Put(key, value []byte) error {
 	b.writes = append(b.writes, keyvalue{key: string(key), value: common.CopyBytes(value)})
 	b.size += len(key) + len(value)
 	return nil
 }
 
 // Delete inserts the key removal into the batch for later committing.
-func (b *batch) Delete(key []byte) error {
+func (b *Batch) Delete(key []byte) error {
 	b.writes = append(b.writes, keyvalue{key: string(key), delete: true})
 	b.size += len(key)
 	return nil
 }
 
 // DeleteRange removes all keys in the range [start, end) from the batch for later committing.
-func (b *batch) DeleteRange(start, end []byte) error {
+func (b *Batch) DeleteRange(start, end []byte) error {
 	b.writes = append(b.writes, keyvalue{
 		rangeFrom: bytes.Clone(start),
 		rangeTo:   bytes.Clone(end),
@@ -268,12 +268,12 @@ func (b *batch) DeleteRange(start, end []byte) error {
 }
 
 // ValueSize retrieves the amount of data queued up for writing.
-func (b *batch) ValueSize() int {
+func (b *Batch) ValueSize() int {
 	return b.size
 }
 
 // Write flushes any accumulated data to the memory database.
-func (b *batch) Write() error {
+func (b *Batch) Write() error {
 	b.db.lock.Lock()
 	defer b.db.lock.Unlock()
 
@@ -305,13 +305,13 @@ func (b *batch) Write() error {
 }
 
 // Reset resets the batch for reuse.
-func (b *batch) Reset() {
+func (b *Batch) Reset() {
 	b.writes = b.writes[:0]
 	b.size = 0
 }
 
 // Replay replays the batch contents.
-func (b *batch) Replay(w ethdb.KeyValueWriter) error {
+func (b *Batch) Replay(w ethdb.KeyValueWriter) error {
 	for _, entry := range b.writes {
 		if entry.delete {
 			if entry.key != "" {

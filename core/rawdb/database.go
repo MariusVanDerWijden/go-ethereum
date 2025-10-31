@@ -34,12 +34,78 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/leveldb"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
+	"github.com/ethereum/go-ethereum/ethdb/pebble"
+	"github.com/ethereum/go-ethereum/ethdb/remotedb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/trie/trienode"
 	"golang.org/x/sync/errgroup"
 )
 
 var ErrDeleteRangeInterrupted = errors.New("safe delete range operation interrupted")
+
+func Get(db ethdb.KeyValueReader, key []byte) ([]byte, error) {
+	var kv ethdb.KeyValueReader
+	switch db := db.(type) {
+	case *freezerdb:
+		kv = db.KeyValueStore
+	case *nofreezedb:
+		kv = db.KeyValueStore
+	default:
+		kv = db
+	}
+	switch kv := kv.(type) {
+	case *pebble.Database:
+		return kv.Get(bytes.Clone(key))
+	case *leveldb.Database:
+		return kv.Get(key)
+	case *memorydb.Database:
+		return kv.Get(key)
+	case *table:
+		return kv.Get(key)
+	case *remotedb.Database:
+		return kv.Get(bytes.Clone(key))
+	case *trienode.ProofSet:
+		return kv.Get(key)
+	default:
+		panic(kv)
+		return kv.Get(bytes.Clone(key))
+	}
+}
+
+func Put(db ethdb.KeyValueWriter, key []byte, value []byte) error {
+	var kv ethdb.KeyValueWriter
+	switch db := db.(type) {
+	case *freezerdb:
+		kv = db.KeyValueStore
+	case *nofreezedb:
+		kv = db.KeyValueStore
+	default:
+		kv = db
+	}
+	switch kv := kv.(type) {
+	case *pebble.Database:
+		return kv.Put(bytes.Clone(key), value)
+	case *pebble.Batch:
+		return kv.Put(key, value)
+	case *leveldb.Database:
+		return kv.Put(bytes.Clone(key), value)
+	case *memorydb.Database:
+		return kv.Put(key, value)
+	case *memorydb.Batch:
+		return kv.Put(key, value)
+	case *table:
+		return kv.Put(key, value)
+	case *remotedb.Database:
+		return kv.Put(bytes.Clone(key), value)
+	case *trienode.ProofSet:
+		return kv.Put(key, value)
+	default:
+		panic(kv)
+		return kv.Put(bytes.Clone(key), value)
+	}
+}
 
 // freezerdb is a database wrapper that enables ancient chain segment freezing.
 type freezerdb struct {

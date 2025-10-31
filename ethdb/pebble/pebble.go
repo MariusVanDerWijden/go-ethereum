@@ -436,7 +436,7 @@ func (d *Database) DeleteRange(start, end []byte) error {
 // NewBatch creates a write-only key-value store that buffers changes to its host
 // database until a final write is called.
 func (d *Database) NewBatch() ethdb.Batch {
-	return &batch{
+	return &Batch{
 		b:  d.db.NewBatch(),
 		db: d,
 	}
@@ -444,7 +444,7 @@ func (d *Database) NewBatch() ethdb.Batch {
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (d *Database) NewBatchWithSize(size int) ethdb.Batch {
-	return &batch{
+	return &Batch{
 		b:  d.db.NewBatchWithSize(size),
 		db: d,
 	}
@@ -618,16 +618,16 @@ func (d *Database) meter(refresh time.Duration, namespace string) {
 	errc <- nil
 }
 
-// batch is a write-only batch that commits changes to its host database
-// when Write is called. A batch cannot be used concurrently.
-type batch struct {
+// Batch is a write-only Batch that commits changes to its host database
+// when Write is called. A Batch cannot be used concurrently.
+type Batch struct {
 	b    *pebble.Batch
 	db   *Database
 	size int
 }
 
 // Put inserts the given value into the batch for later committing.
-func (b *batch) Put(key, value []byte) error {
+func (b *Batch) Put(key, value []byte) error {
 	if err := b.b.Set(key, value, nil); err != nil {
 		return err
 	}
@@ -636,7 +636,7 @@ func (b *batch) Put(key, value []byte) error {
 }
 
 // Delete inserts the key removal into the batch for later committing.
-func (b *batch) Delete(key []byte) error {
+func (b *Batch) Delete(key []byte) error {
 	if err := b.b.Delete(key, nil); err != nil {
 		return err
 	}
@@ -646,7 +646,7 @@ func (b *batch) Delete(key []byte) error {
 
 // DeleteRange removes all keys in the range [start, end) from the batch for
 // later committing, inclusive on start, exclusive on end.
-func (b *batch) DeleteRange(start, end []byte) error {
+func (b *Batch) DeleteRange(start, end []byte) error {
 	// There is no special flag to represent the end of key range
 	// in pebble(nil in leveldb). Use an ugly hack to construct a
 	// large key to represent it.
@@ -662,12 +662,12 @@ func (b *batch) DeleteRange(start, end []byte) error {
 }
 
 // ValueSize retrieves the amount of data queued up for writing.
-func (b *batch) ValueSize() int {
+func (b *Batch) ValueSize() int {
 	return b.size
 }
 
 // Write flushes any accumulated data to disk.
-func (b *batch) Write() error {
+func (b *Batch) Write() error {
 	b.db.quitLock.RLock()
 	defer b.db.quitLock.RUnlock()
 	if b.db.closed {
@@ -677,13 +677,13 @@ func (b *batch) Write() error {
 }
 
 // Reset resets the batch for reuse.
-func (b *batch) Reset() {
+func (b *Batch) Reset() {
 	b.b.Reset()
 	b.size = 0
 }
 
 // Replay replays the batch contents.
-func (b *batch) Replay(w ethdb.KeyValueWriter) error {
+func (b *Batch) Replay(w ethdb.KeyValueWriter) error {
 	reader := b.b.Reader()
 	for {
 		kind, k, v, ok, err := reader.Next()

@@ -49,7 +49,7 @@ func ReadCanonicalHash(db ethdb.Reader, number uint64) common.Hash {
 
 // WriteCanonicalHash stores the hash assigned to a canonical block number.
 func WriteCanonicalHash(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
-	if err := db.Put(headerHashKey(number), hash.Bytes()); err != nil {
+	if err := Put(db, headerHashKey(number), hash.Bytes()); err != nil {
 		log.Crit("Failed to store number to hash mapping", "err", err)
 	}
 }
@@ -156,7 +156,7 @@ func ReadHeaderNumber(db ethdb.KeyValueReader, hash common.Hash) (uint64, bool) 
 func WriteHeaderNumber(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 	key := headerNumberKey(hash)
 	enc := encodeUint64(number)
-	if err := db.Put(key, enc); err != nil {
+	if err := Put(db, key, enc); err != nil {
 		log.Crit("Failed to store hash to number mapping", "err", err)
 	}
 }
@@ -179,7 +179,7 @@ func ReadHeadHeaderHash(db ethdb.KeyValueReader) common.Hash {
 
 // WriteHeadHeaderHash stores the hash of the current canonical head header.
 func WriteHeadHeaderHash(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Put(headHeaderKey, hash.Bytes()); err != nil {
+	if err := Put(db, headHeaderKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last header's hash", "err", err)
 	}
 }
@@ -195,7 +195,7 @@ func ReadHeadBlockHash(db ethdb.KeyValueReader) common.Hash {
 
 // WriteHeadBlockHash stores the head block's hash.
 func WriteHeadBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Put(headBlockKey, hash.Bytes()); err != nil {
+	if err := Put(db, headBlockKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last block's hash", "err", err)
 	}
 }
@@ -211,7 +211,7 @@ func ReadHeadFastBlockHash(db ethdb.KeyValueReader) common.Hash {
 
 // WriteHeadFastBlockHash stores the hash of the current fast-sync head block.
 func WriteHeadFastBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Put(headFastBlockKey, hash.Bytes()); err != nil {
+	if err := Put(db, headFastBlockKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last fast block's hash", "err", err)
 	}
 }
@@ -227,7 +227,7 @@ func ReadFinalizedBlockHash(db ethdb.KeyValueReader) common.Hash {
 
 // WriteFinalizedBlockHash stores the hash of the finalized block.
 func WriteFinalizedBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Put(headFinalizedBlockKey, hash.Bytes()); err != nil {
+	if err := Put(db, headFinalizedBlockKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last finalized block's hash", "err", err)
 	}
 }
@@ -253,7 +253,7 @@ func WriteLastPivotNumber(db ethdb.KeyValueWriter, pivot uint64) {
 	if err != nil {
 		log.Crit("Failed to encode pivot block number", "err", err)
 	}
-	if err := db.Put(lastPivotKey, enc); err != nil {
+	if err := Put(db, lastPivotKey, enc); err != nil {
 		log.Crit("Failed to store pivot block number", "err", err)
 	}
 }
@@ -272,7 +272,7 @@ func ReadTxIndexTail(db ethdb.KeyValueReader) *uint64 {
 // WriteTxIndexTail stores the number of oldest indexed block
 // into database.
 func WriteTxIndexTail(db ethdb.KeyValueWriter, number uint64) {
-	if err := db.Put(txIndexTailKey, encodeUint64(number)); err != nil {
+	if err := Put(db, txIndexTailKey, encodeUint64(number)); err != nil {
 		log.Crit("Failed to store the transaction index tail", "err", err)
 	}
 }
@@ -399,7 +399,7 @@ func WriteHeader(db ethdb.KeyValueWriter, header *types.Header) {
 		log.Crit("Failed to RLP encode header", "err", err)
 	}
 	key := headerKey(number, hash)
-	if err := db.Put(key, data); err != nil {
+	if err := Put(db, key, data); err != nil {
 		log.Crit("Failed to store header", "err", err)
 	}
 }
@@ -475,7 +475,7 @@ func ReadCanonicalBodyRLP(db ethdb.Reader, number uint64, hash *common.Hash) rlp
 
 // WriteBodyRLP stores an RLP encoded block body into the database.
 func WriteBodyRLP(db ethdb.KeyValueWriter, hash common.Hash, number uint64, rlp rlp.RawValue) {
-	if err := db.Put(blockBodyKey(number, hash), rlp); err != nil {
+	if err := Put(db, blockBodyKey(number, hash), rlp); err != nil {
 		log.Crit("Failed to store block body", "err", err)
 	}
 }
@@ -644,7 +644,7 @@ func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, rec
 		log.Crit("Failed to encode block receipts", "err", err)
 	}
 	// Store the flattened receipt slice
-	if err := db.Put(blockReceiptsKey(number, hash), bytes); err != nil {
+	if err := Put(db, blockReceiptsKey(number, hash), bytes); err != nil {
 		log.Crit("Failed to store block receipts", "err", err)
 	}
 }
@@ -652,7 +652,7 @@ func WriteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, rec
 // WriteRawReceipts stores all the transaction receipts belonging to a block.
 func WriteRawReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64, receipts rlp.RawValue) {
 	// Store the flattened receipt slice
-	if err := db.Put(blockReceiptsKey(number, hash), receipts); err != nil {
+	if err := Put(db, blockReceiptsKey(number, hash), receipts); err != nil {
 		log.Crit("Failed to store block receipts", "err", err)
 	}
 }
@@ -881,7 +881,7 @@ func WriteBadBlock(db ethdb.KeyValueStore, block *types.Block) {
 	if err != nil {
 		log.Crit("Failed to encode bad blocks", "err", err)
 	}
-	if err := db.Put(badBlockKey, data); err != nil {
+	if err := Put(db, badBlockKey, data); err != nil {
 		log.Crit("Failed to write bad blocks", "err", err)
 	}
 }

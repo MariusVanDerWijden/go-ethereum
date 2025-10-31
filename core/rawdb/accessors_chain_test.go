@@ -957,3 +957,27 @@ func TestHeadersRLPStorage(t *testing.T) {
 	checkSequence(1, 1)    // Only block 1
 	checkSequence(1, 2)    // Genesis + block 1
 }
+
+func BenchmarkCodeKey(b *testing.B) {
+	db := NewMemoryDatabase()
+	WriteCode(db, common.Hash{0x01}, make([]byte, 10))
+	for range b.N {
+		ReadCodeWithPrefix2(db, common.Hash{0x01})
+	}
+}
+
+func BenchmarkWriteCodeKey(b *testing.B) {
+	db := NewMemoryDatabase()
+	value := make([]byte, 10)
+	for range b.N {
+		WriteCode(db, common.Hash{0x01}, value)
+	}
+}
+
+func BenchmarkWriteCodeKey2(b *testing.B) {
+	db := NewMemoryDatabase()
+	value := make([]byte, 10)
+	for range b.N {
+		WriteCode2(db, common.Hash{0x01}, value)
+	}
+}

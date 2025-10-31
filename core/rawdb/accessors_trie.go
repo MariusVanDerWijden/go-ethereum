@@ -46,7 +46,7 @@ const PathScheme = "path"
 
 // ReadAccountTrieNode retrieves the account trie node with the specified node path.
 func ReadAccountTrieNode(db ethdb.KeyValueReader, path []byte) []byte {
-	data, _ := db.Get(accountTrieNodeKey(path))
+	data, _ := Get(db, accountTrieNodeKey(path))
 	return data
 }
 
@@ -62,7 +62,7 @@ func HasAccountTrieNode(db ethdb.KeyValueReader, path []byte) bool {
 
 // WriteAccountTrieNode writes the provided account trie node into database.
 func WriteAccountTrieNode(db ethdb.KeyValueWriter, path []byte, node []byte) {
-	if err := db.Put(accountTrieNodeKey(path), node); err != nil {
+	if err := Put(db, accountTrieNodeKey(path), node); err != nil {
 		log.Crit("Failed to store account trie node", "err", err)
 	}
 }
@@ -76,7 +76,7 @@ func DeleteAccountTrieNode(db ethdb.KeyValueWriter, path []byte) {
 
 // ReadStorageTrieNode retrieves the storage trie node with the specified node path.
 func ReadStorageTrieNode(db ethdb.KeyValueReader, accountHash common.Hash, path []byte) []byte {
-	data, _ := db.Get(storageTrieNodeKey(accountHash, path))
+	data, _ := Get(db, storageTrieNodeKey(accountHash, path))
 	return data
 }
 
@@ -92,7 +92,7 @@ func HasStorageTrieNode(db ethdb.KeyValueReader, accountHash common.Hash, path [
 
 // WriteStorageTrieNode writes the provided storage trie node into database.
 func WriteStorageTrieNode(db ethdb.KeyValueWriter, accountHash common.Hash, path []byte, node []byte) {
-	if err := db.Put(storageTrieNodeKey(accountHash, path), node); err != nil {
+	if err := Put(db, storageTrieNodeKey(accountHash, path), node); err != nil {
 		log.Crit("Failed to store storage trie node", "err", err)
 	}
 }
@@ -107,7 +107,7 @@ func DeleteStorageTrieNode(db ethdb.KeyValueWriter, accountHash common.Hash, pat
 // ReadLegacyTrieNode retrieves the legacy trie node with the given
 // associated node hash.
 func ReadLegacyTrieNode(db ethdb.KeyValueReader, hash common.Hash) []byte {
-	data, err := db.Get(hash.Bytes())
+	data, err := Get(db, hash.Bytes())
 	if err != nil {
 		return nil
 	}
@@ -122,7 +122,7 @@ func HasLegacyTrieNode(db ethdb.KeyValueReader, hash common.Hash) bool {
 
 // WriteLegacyTrieNode writes the provided legacy trie node to database.
 func WriteLegacyTrieNode(db ethdb.KeyValueWriter, hash common.Hash, node []byte) {
-	if err := db.Put(hash.Bytes(), node); err != nil {
+	if err := Put(db, hash.Bytes(), node); err != nil {
 		log.Crit("Failed to store legacy trie node", "err", err)
 	}
 }
