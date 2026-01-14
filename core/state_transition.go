@@ -249,7 +249,7 @@ type stateTransition struct {
 	gp           *GasPool
 	msg          *Message
 	gasRemaining vm.GasCosts
-	initialGas   uint64
+	initialGas   vm.GasCosts
 	state        vm.StateDB
 	evm          *vm.EVM
 }
@@ -310,7 +310,11 @@ func (st *stateTransition) buyGas() error {
 	}
 	st.gasRemaining.RegularGas = st.msg.GasLimit
 
-	st.initialGas = st.msg.GasLimit
+	// After Amsterdam we limit the regular gas to 16k, the data gas to the transaction limit
+	if st.evm.ChainConfig().IsAmsterdam(st.evm.Context.BlockNumber, st.evm.Context.Time) {
+		st.msg.GasLimit = min(st.msg.GasLimit, params.MaxTxGas)
+	}
+	st.initialGas = vm.GasCosts{RegularGas: st.msg.GasLimit, StateGas: st.msg.GasLimit}
 	mgvalU256, _ := uint256.FromBig(mgval)
 	st.state.SubBalance(st.msg.From, mgvalU256, tracing.BalanceDecreaseGasBuy)
 	return nil
@@ -542,7 +546,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		// After EIP-7623: Data-heavy transactions pay the floor gas.
 		if st.gasUsed() < floorDataGas {
 			prev := st.gasRemaining.RegularGas
-			st.gasRemaining.RegularGas = st.initialGas - floorDataGas
+			st.gasRemaining.RegularGas = st.initialGas.RegularGas - floorDataGas
 			if t := st.evm.Config.Tracer; t != nil && t.OnGasChange != nil {
 				t.OnGasChange(prev, st.gasRemaining.RegularGas, tracing.GasChangeTxDataFloor)
 			}
@@ -684,7 +688,7 @@ func (st *stateTransition) returnGas() {
 
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *stateTransition) gasUsed() uint64 {
-	return st.initialGas - st.gasRemaining.RegularGas
+	return st.initialGas.RegularGas - st.gasRemaining.RegularGas
 }
 
 // blobGasUsed returns the amount of blob gas used by the message.
