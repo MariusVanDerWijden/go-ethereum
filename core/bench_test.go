@@ -100,7 +100,7 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 			Nonce:    gen.TxNonce(benchRootAddr),
 			To:       &toaddr,
 			Value:    big.NewInt(1),
-			Gas:      gas,
+			Gas:      gas.RegularGas,
 			Data:     data,
 			GasPrice: gasPrice,
 		})

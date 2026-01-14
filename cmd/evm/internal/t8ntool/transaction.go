@@ -141,8 +141,8 @@ func Transaction(ctx *cli.Context) error {
 			results = append(results, r)
 			continue
 		}
-		r.IntrinsicGas = gas
-		if tx.Gas() < gas {
+		r.IntrinsicGas = gas.RegularGas
+		if tx.Gas() < gas.RegularGas {
 			r.Error = fmt.Errorf("%w: have %d, want %d", core.ErrIntrinsicGas, tx.Gas(), gas)
 			results = append(results, r)
 			continue

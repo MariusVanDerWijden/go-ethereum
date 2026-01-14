@@ -568,7 +568,7 @@ func opMsize(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 }
 
 func opGas(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
-	scope.Stack.push(new(uint256.Int).SetUint64(scope.Contract.Gas))
+	scope.Stack.push(new(uint256.Int).SetUint64(scope.Contract.Gas.RegularGas))
 	return nil, nil
 }
 
@@ -663,7 +663,7 @@ func opCreate(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 		gas          = scope.Contract.Gas
 	)
 	if evm.chainRules.IsEIP150 {
-		gas -= gas / 64
+		gas.RegularGas -= gas.RegularGas / 64
 	}
 
 	// reuse size int for stackvalue
@@ -708,7 +708,7 @@ func opCreate2(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 	)
 
 	// Apply EIP150
-	gas -= gas / 64
+	gas.RegularGas -= gas.RegularGas / 64
 	scope.Contract.UseGas(gas, evm.Config.Tracer, tracing.GasChangeCallContractCreation2)
 	// reuse size int for stackvalue
 	stackvalue := size
@@ -749,7 +749,7 @@ func opCall(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 	if !value.IsZero() {
 		gas += params.CallStipend
 	}
-	ret, returnGas, err := evm.Call(scope.Contract.Address(), toAddr, args, gas, &value)
+	ret, returnGas, err := evm.Call(scope.Contract.Address(), toAddr, args, GasCosts{RegularGas: gas, StateGas: scope.Contract.Gas.StateGas}, &value)
 
 	if err != nil {
 		temp.Clear()
@@ -783,7 +783,7 @@ func opCallCode(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 		gas += params.CallStipend
 	}
 
-	ret, returnGas, err := evm.CallCode(scope.Contract.Address(), toAddr, args, gas, &value)
+	ret, returnGas, err := evm.CallCode(scope.Contract.Address(), toAddr, args, GasCosts{RegularGas: gas, StateGas: scope.Contract.Gas.StateGas}, &value)
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -812,7 +812,7 @@ func opDelegateCall(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(inOffset.Uint64(), inSize.Uint64())
 
-	ret, returnGas, err := evm.DelegateCall(scope.Contract.Caller(), scope.Contract.Address(), toAddr, args, gas, scope.Contract.value)
+	ret, returnGas, err := evm.DelegateCall(scope.Contract.Caller(), scope.Contract.Address(), toAddr, args, GasCosts{RegularGas: gas, StateGas: scope.Contract.Gas.StateGas}, scope.Contract.value)
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -841,7 +841,7 @@ func opStaticCall(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(inOffset.Uint64(), inSize.Uint64())
 
-	ret, returnGas, err := evm.StaticCall(scope.Contract.Address(), toAddr, args, gas)
+	ret, returnGas, err := evm.StaticCall(scope.Contract.Address(), toAddr, args, GasCosts{RegularGas: gas, StateGas: scope.Contract.Gas.StateGas})
 	if err != nil {
 		temp.Clear()
 	} else {
