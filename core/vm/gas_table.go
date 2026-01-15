@@ -625,7 +625,7 @@ func gasSStore8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memo
 		if original == (common.Hash{}) { // reset to original inexistent slot (2.2.2.1)
 			// EIP 2200 Original clause:
 			//evm.StateDB.AddRefund(params.SstoreSetGasEIP2200 - params.SloadGasEIP2200)
-			evm.StateDB.AddRefund(params.StorageCreationSize*evm.Context.CostPerGasByte - params.WarmStorageReadCostEIP2929)
+			evm.StateDB.AddRefund(params.StorageCreationSize * evm.Context.CostPerGasByte)
 		} else { // reset to original existing slot (2.2.2.2)
 			// EIP 2200 Original clause:
 			//	evm.StateDB.AddRefund(params.SstoreResetGasEIP2200 - params.SloadGasEIP2200)
