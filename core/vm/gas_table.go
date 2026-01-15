@@ -605,14 +605,14 @@ func gasSStore8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memo
 	}
 	if original == current {
 		if original == (common.Hash{}) { // create slot (2.1.1)
-			return GasCosts{RegularGas: cost.RegularGas, StateGas: params.StorageCreationSize * evm.Context.CostPerGasByte}, nil
+			return GasCosts{RegularGas: cost.RegularGas + params.SstoreResetGasEIP2200 - params.ColdSloadCostEIP2929, StateGas: params.StorageCreationSize * evm.Context.CostPerGasByte}, nil
 		}
 		if value == (common.Hash{}) { // delete slot (2.1.2b)
 			evm.StateDB.AddRefund(params.SstoreClearsScheduleRefundEIP3529)
 		}
 		// EIP-2200 original clause:
 		//		return params.SstoreResetGasEIP2200, nil // write existing slot (2.1.2)
-		return GasCosts{RegularGas: cost.RegularGas, StateGas: params.SstoreResetGasEIP2200 - params.ColdSloadCostEIP2929}, nil // write existing slot (2.1.2)
+		return GasCosts{RegularGas: cost.RegularGas + params.SstoreResetGasEIP2200 - params.ColdSloadCostEIP2929}, nil // write existing slot (2.1.2)
 	}
 	if original != (common.Hash{}) {
 		if current == (common.Hash{}) { // recreate slot (2.2.1.1)
