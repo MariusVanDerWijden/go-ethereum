@@ -502,8 +502,9 @@ func gasCreateEip8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, m
 		return GasCosts{}, fmt.Errorf("%w: size %d", ErrMaxInitCodeSizeExceeded, size)
 	}
 	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
-	moreGas := params.AccountCreationSize * evm.Context.CostPerGasByte * ((size + 31) / 32)
-	return GasCosts{RegularGas: gas, StateGas: moreGas}, nil
+	wordGas := params.InitCodeWordGas * ((size + 31) / 32)
+	stateGas := params.AccountCreationSize * evm.Context.CostPerGasByte
+	return GasCosts{RegularGas: gas + wordGas, StateGas: stateGas}, nil
 }
 
 func gasCreate2Eip8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (GasCosts, error) {
@@ -519,8 +520,9 @@ func gasCreate2Eip8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, 
 		return GasCosts{}, fmt.Errorf("%w: size %d", ErrMaxInitCodeSizeExceeded, size)
 	}
 	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
-	moreGas := (params.AccountCreationSize*evm.Context.CostPerGasByte + params.Keccak256WordGas) * ((size + 31) / 32)
-	return GasCosts{RegularGas: gas, StateGas: moreGas}, nil
+	wordGas := (params.InitCodeWordGas + params.Keccak256WordGas) * ((size + 31) / 32)
+	stateGas := params.AccountCreationSize * evm.Context.CostPerGasByte
+	return GasCosts{RegularGas: gas + wordGas, StateGas: stateGas}, nil
 }
 
 func gasCall8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (GasCosts, error) {
