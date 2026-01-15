@@ -593,7 +593,9 @@ func (evm *EVM) initNewContract(contract *Contract, address common.Address) ([]b
 	if !evm.chainRules.IsEIP4762 {
 		createDataGas := GasCosts{RegularGas: uint64(len(ret)) * params.CreateDataGas}
 		if evm.chainRules.IsAmsterdam {
-			createDataGas = GasCosts{StateGas: uint64(len(ret)) * evm.Context.CostPerGasByte}
+			// State gas for code bytes + regular gas for keccak256 hash cost
+			codeHashGas := params.Keccak256WordGas * ((uint64(len(ret)) + 31) / 32)
+			createDataGas = GasCosts{RegularGas: codeHashGas, StateGas: uint64(len(ret)) * evm.Context.CostPerGasByte}
 		}
 		if !contract.UseGas(createDataGas, evm.Config.Tracer, tracing.GasChangeCallCodeStorage) {
 			return ret, ErrCodeStoreOutOfGas
