@@ -188,6 +188,7 @@ const (
 	AccountCreationSize       = 112
 	StorageCreationSize       = 32
 	AuthorizationCreationSize = 23
+	TxAuthBaseGas             = 7500
 )
 
 // Bls12381G1MultiExpDiscountTable is the gas discount table for BLS12-381 G1 multi exponentiation operation
