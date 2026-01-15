@@ -311,10 +311,11 @@ func (st *stateTransition) buyGas() error {
 	st.gasRemaining.RegularGas = st.msg.GasLimit
 
 	// After Amsterdam we limit the regular gas to 16k, the data gas to the transaction limit
+	limit := st.msg.GasLimit
 	if st.evm.ChainConfig().IsAmsterdam(st.evm.Context.BlockNumber, st.evm.Context.Time) {
-		st.msg.GasLimit = min(st.msg.GasLimit, params.MaxTxGas)
+		limit = min(st.msg.GasLimit, params.MaxTxGas)
 	}
-	st.initialGas = vm.GasCosts{RegularGas: st.msg.GasLimit, StateGas: st.msg.GasLimit}
+	st.initialGas = vm.GasCosts{RegularGas: limit, StateGas: st.msg.GasLimit - limit}
 	mgvalU256, _ := uint256.FromBig(mgval)
 	st.state.SubBalance(st.msg.From, mgvalU256, tracing.BalanceDecreaseGasBuy)
 	return nil
