@@ -117,7 +117,8 @@ func IntrinsicGas(data []byte, accessList types.AccessList, authList []types.Set
 	}
 	if authList != nil {
 		if rules.IsAmsterdam {
-			gas.StateGas += uint64(len(authList)) * costPerStateByte
+			gas.RegularGas += uint64(len(authList)) * params.TxAuthBaseGas
+			gas.StateGas += uint64(len(authList)) * (params.AccountCreationSize + params.AuthorizationCreationSize) * costPerStateByte
 		} else {
 			gas.RegularGas += uint64(len(authList)) * params.CallNewAccountGas
 		}
