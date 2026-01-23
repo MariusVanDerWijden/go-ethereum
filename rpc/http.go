@@ -19,7 +19,6 @@ package rpc
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +29,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	json "github.com/goccy/go-json"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
