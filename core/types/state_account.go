@@ -17,8 +17,6 @@
 package types
 
 import (
-	"bytes"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
@@ -32,7 +30,7 @@ type StateAccount struct {
 	Nonce    uint64
 	Balance  *uint256.Int
 	Root     common.Hash // merkle root of the storage trie
-	CodeHash []byte
+	CodeHash common.Hash
 }
 
 // NewEmptyStateAccount constructs an empty state account.
@@ -40,7 +38,7 @@ func NewEmptyStateAccount() *StateAccount {
 	return &StateAccount{
 		Balance:  new(uint256.Int),
 		Root:     EmptyRootHash,
-		CodeHash: EmptyCodeHash.Bytes(),
+		CodeHash: EmptyCodeHash,
 	}
 }
 
@@ -54,7 +52,7 @@ func (acct *StateAccount) Copy() *StateAccount {
 		Nonce:    acct.Nonce,
 		Balance:  balance,
 		Root:     acct.Root,
-		CodeHash: common.CopyBytes(acct.CodeHash),
+		CodeHash: acct.CodeHash,
 	}
 }
 
@@ -77,8 +75,8 @@ func SlimAccountRLP(account StateAccount) []byte {
 	if account.Root != EmptyRootHash {
 		slim.Root = account.Root[:]
 	}
-	if !bytes.Equal(account.CodeHash, EmptyCodeHash[:]) {
-		slim.CodeHash = account.CodeHash
+	if account.CodeHash != EmptyCodeHash {
+		slim.CodeHash = account.CodeHash[:]
 	}
 	data, err := rlp.EncodeToBytes(slim)
 	if err != nil {
@@ -104,9 +102,9 @@ func FullAccount(data []byte) (*StateAccount, error) {
 		account.Root = common.BytesToHash(slim.Root)
 	}
 	if len(slim.CodeHash) == 0 {
-		account.CodeHash = EmptyCodeHash[:]
+		account.CodeHash = EmptyCodeHash
 	} else {
-		account.CodeHash = slim.CodeHash
+		account.CodeHash = common.BytesToHash(slim.CodeHash)
 	}
 	return &account, nil
 }

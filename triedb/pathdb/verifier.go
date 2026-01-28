@@ -299,7 +299,7 @@ func generateTrieRoot(it Iterator, account common.Hash, generatorFn trieHasherFn
 					return stop(err)
 				}
 				go func(hash common.Hash) {
-					subroot, err := leafCallback(hash, common.BytesToHash(account.CodeHash), stats)
+					subroot, err := leafCallback(hash, account.CodeHash, stats)
 					if err != nil {
 						results <- err
 						return

@@ -360,9 +360,9 @@ func traverseState(ctx *cli.Context) error {
 				return storageIter.Err
 			}
 		}
-		if !bytes.Equal(acc.CodeHash, types.EmptyCodeHash.Bytes()) {
-			if !rawdb.HasCode(chaindb, common.BytesToHash(acc.CodeHash)) {
-				log.Error("Code is missing", "hash", common.BytesToHash(acc.CodeHash))
+		if acc.CodeHash != types.EmptyCodeHash {
+			if !rawdb.HasCode(chaindb, acc.CodeHash) {
+				log.Error("Code is missing", "hash", acc.CodeHash)
 				return errors.New("missing code")
 			}
 			codes += 1
@@ -518,8 +518,8 @@ func traverseRawState(ctx *cli.Context) error {
 					return storageIter.Error()
 				}
 			}
-			if !bytes.Equal(acc.CodeHash, types.EmptyCodeHash.Bytes()) {
-				if !rawdb.HasCode(chaindb, common.BytesToHash(acc.CodeHash)) {
+			if acc.CodeHash != types.EmptyCodeHash {
+				if !rawdb.HasCode(chaindb, acc.CodeHash) {
 					log.Error("Code is missing", "account", common.BytesToHash(accIter.LeafKey()))
 					return errors.New("missing code")
 				}
@@ -590,11 +590,11 @@ func dumpState(ctx *cli.Context) error {
 			Balance:     account.Balance.String(),
 			Nonce:       account.Nonce,
 			Root:        account.Root.Bytes(),
-			CodeHash:    account.CodeHash,
+			CodeHash:    account.CodeHash[:],
 			AddressHash: accIt.Hash().Bytes(),
 		}
-		if !conf.SkipCode && !bytes.Equal(account.CodeHash, types.EmptyCodeHash.Bytes()) {
-			da.Code = rawdb.ReadCode(db, common.BytesToHash(account.CodeHash))
+		if !conf.SkipCode && account.CodeHash != types.EmptyCodeHash {
+			da.Code = rawdb.ReadCode(db, account.CodeHash)
 		}
 		if !conf.SkipStorage {
 			da.Storage = make(map[common.Hash]string)

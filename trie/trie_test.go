@@ -806,7 +806,7 @@ func makeAccounts(size int) (addresses [][20]byte, accounts [][]byte) {
 			Nonce:    nonce,
 			Balance:  balance,
 			Root:     root,
-			CodeHash: code,
+			CodeHash: common.BytesToHash(code),
 		})
 		accounts[i] = data
 	}
