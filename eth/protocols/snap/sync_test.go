@@ -1502,7 +1502,7 @@ func makeAccountTrieNoStorage(n int, scheme string) (string, *trie.Trie, []*kv) 
 			Nonce:    i,
 			Balance:  uint256.NewInt(i),
 			Root:     types.EmptyRootHash,
-			CodeHash: getCodeHash(i),
+			CodeHash: common.BytesToHash(getCodeHash(i)),
 		})
 		key := key32(i)
 		elem := &kv{key, value}
@@ -1553,7 +1553,7 @@ func makeBoundaryAccountTrie(scheme string, n int) (string, *trie.Trie, []*kv) {
 			Nonce:    uint64(0),
 			Balance:  uint256.NewInt(uint64(i)),
 			Root:     types.EmptyRootHash,
-			CodeHash: getCodeHash(uint64(i)),
+			CodeHash: common.BytesToHash(getCodeHash(uint64(i))),
 		})
 		elem := &kv{boundaries[i].Bytes(), value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1565,7 +1565,7 @@ func makeBoundaryAccountTrie(scheme string, n int) (string, *trie.Trie, []*kv) {
 			Nonce:    i,
 			Balance:  uint256.NewInt(i),
 			Root:     types.EmptyRootHash,
-			CodeHash: getCodeHash(i),
+			CodeHash: common.BytesToHash(getCodeHash(i)),
 		})
 		elem := &kv{key32(i), value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1609,7 +1609,7 @@ func makeAccountTrieWithStorageWithUniqueStorage(scheme string, accounts, slots 
 			Nonce:    i,
 			Balance:  uint256.NewInt(i),
 			Root:     stRoot,
-			CodeHash: codehash,
+			CodeHash: common.BytesToHash(codehash),
 		})
 		elem := &kv{key, value}
 		accTrie.MustUpdate(elem.k, elem.v)
@@ -1675,7 +1675,7 @@ func makeAccountTrieWithStorage(scheme string, accounts, slots int, code, bounda
 			Nonce:    i,
 			Balance:  uint256.NewInt(i),
 			Root:     stRoot,
-			CodeHash: codehash,
+			CodeHash: common.BytesToHash(codehash),
 		})
 		elem := &kv{key, value}
 		accTrie.MustUpdate(elem.k, elem.v)

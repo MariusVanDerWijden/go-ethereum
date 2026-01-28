@@ -252,9 +252,9 @@ func (r *flatReader) Account(addr common.Address) (*types.StateAccount, error) {
 		return nil, nil
 	}
 	acct := &types.StateAccount{
-		Nonce:    account.Nonce,
-		Balance:  account.Balance,
-		Root:     common.BytesToHash(account.Root),
+		Nonce:   account.Nonce,
+		Balance: account.Balance,
+		Root:    common.BytesToHash(account.Root),
 	}
 	if len(account.CodeHash) == 0 {
 		acct.CodeHash = types.EmptyCodeHash
