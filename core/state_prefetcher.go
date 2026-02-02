@@ -17,11 +17,9 @@
 package core
 
 import (
-	"bytes"
 	"runtime"
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -79,8 +77,8 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 				account, _ := reader.Account(*tx.To())
 
 				// Preload the contract code if the destination has non-empty code
-				if account != nil && !bytes.Equal(account.CodeHash, types.EmptyCodeHash.Bytes()) {
-					reader.Code(*tx.To(), common.BytesToHash(account.CodeHash))
+				if account != nil && account.CodeHash != types.EmptyCodeHash {
+					reader.Code(*tx.To(), account.CodeHash)
 				}
 			}
 			for _, list := range tx.AccessList() {

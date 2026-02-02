@@ -17,7 +17,6 @@
 package state
 
 import (
-	"bytes"
 	"fmt"
 	"maps"
 	"slices"
@@ -90,7 +89,7 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	return s.data.Nonce == 0 && s.data.Balance.IsZero() && bytes.Equal(s.data.CodeHash, types.EmptyCodeHash.Bytes())
+	return s.data.Nonce == 0 && s.data.Balance.IsZero() && s.data.CodeHash == types.EmptyCodeHash
 }
 
 // newObject creates a state object.
@@ -436,7 +435,7 @@ func (s *stateObject) commit() (*accountUpdate, *trienode.NodeSet, error) {
 	// commit the contract code if it's modified
 	if s.dirtyCode {
 		op.code = &contractCode{
-			hash: common.BytesToHash(s.CodeHash()),
+			hash: s.CodeHash(),
 			blob: s.code,
 		}
 		s.dirtyCode = false // reset the dirty flag
@@ -444,7 +443,7 @@ func (s *stateObject) commit() (*accountUpdate, *trienode.NodeSet, error) {
 		if s.origin == nil {
 			op.code.originHash = types.EmptyCodeHash
 		} else {
-			op.code.originHash = common.BytesToHash(s.origin.CodeHash)
+			op.code.originHash = s.origin.CodeHash
 		}
 	}
 	// Commit storage changes and the associated storage trie
@@ -535,7 +534,7 @@ func (s *stateObject) Code() []byte {
 	if len(s.code) != 0 {
 		return s.code
 	}
-	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
+	if s.CodeHash() == types.EmptyCodeHash {
 		return nil
 	}
 	defer func(start time.Time) {
@@ -544,7 +543,7 @@ func (s *stateObject) Code() []byte {
 		s.db.CodeLoadBytes += len(s.code)
 	}(time.Now())
 
-	code, err := s.db.reader.Code(s.address, common.BytesToHash(s.CodeHash()))
+	code, err := s.db.reader.Code(s.address, s.CodeHash())
 	if err != nil {
 		s.db.setError(fmt.Errorf("can't load code hash %x: %v", s.CodeHash(), err))
 	}
@@ -562,7 +561,7 @@ func (s *stateObject) CodeSize() int {
 	if len(s.code) != 0 {
 		return len(s.code)
 	}
-	if bytes.Equal(s.CodeHash(), types.EmptyCodeHash.Bytes()) {
+	if s.CodeHash() == types.EmptyCodeHash {
 		return 0
 	}
 	defer func(start time.Time) {
@@ -570,7 +569,7 @@ func (s *stateObject) CodeSize() int {
 		s.db.CodeReads += time.Since(start)
 	}(time.Now())
 
-	size, err := s.db.reader.CodeSize(s.address, common.BytesToHash(s.CodeHash()))
+	size, err := s.db.reader.CodeSize(s.address, s.CodeHash())
 	if err != nil {
 		s.db.setError(fmt.Errorf("can't load code size %x: %v", s.CodeHash(), err))
 	}
@@ -589,7 +588,7 @@ func (s *stateObject) SetCode(codeHash common.Hash, code []byte) (prev []byte) {
 
 func (s *stateObject) setCode(codeHash common.Hash, code []byte) {
 	s.code = code
-	s.data.CodeHash = codeHash[:]
+	s.data.CodeHash = codeHash
 	s.dirtyCode = true
 }
 
@@ -602,7 +601,7 @@ func (s *stateObject) setNonce(nonce uint64) {
 	s.data.Nonce = nonce
 }
 
-func (s *stateObject) CodeHash() []byte {
+func (s *stateObject) CodeHash() common.Hash {
 	return s.data.CodeHash
 }
 

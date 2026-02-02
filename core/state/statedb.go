@@ -379,7 +379,7 @@ func (s *StateDB) GetCodeSize(addr common.Address) int {
 func (s *StateDB) GetCodeHash(addr common.Address) common.Hash {
 	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
-		return common.BytesToHash(stateObject.CodeHash())
+		return stateObject.CodeHash()
 	}
 	return common.Hash{}
 }
@@ -508,7 +508,7 @@ func (s *StateDB) SetStorage(addr common.Address, storage map[common.Hash]common
 	}
 	// Inherit the metadata of original object if it was existent
 	if obj != nil {
-		newObj.SetCode(common.BytesToHash(obj.CodeHash()), obj.code)
+		newObj.SetCode(obj.CodeHash(), obj.code)
 		newObj.SetNonce(obj.Nonce())
 		newObj.SetBalance(obj.Balance())
 	}
@@ -565,7 +565,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 		s.setError(fmt.Errorf("updateStateObject (%x) error: %v", obj.Address(), err))
 	}
 	if obj.dirtyCode {
-		s.trie.UpdateContractCode(obj.Address(), common.BytesToHash(obj.CodeHash()), obj.code)
+		s.trie.UpdateContractCode(obj.Address(), obj.CodeHash(), obj.code)
 	}
 }
 

@@ -252,13 +252,14 @@ func (r *flatReader) Account(addr common.Address) (*types.StateAccount, error) {
 		return nil, nil
 	}
 	acct := &types.StateAccount{
-		Nonce:    account.Nonce,
-		Balance:  account.Balance,
-		CodeHash: account.CodeHash,
-		Root:     common.BytesToHash(account.Root),
+		Nonce:   account.Nonce,
+		Balance: account.Balance,
+		Root:    common.BytesToHash(account.Root),
 	}
-	if len(acct.CodeHash) == 0 {
-		acct.CodeHash = types.EmptyCodeHash.Bytes()
+	if len(account.CodeHash) == 0 {
+		acct.CodeHash = types.EmptyCodeHash
+	} else {
+		acct.CodeHash = common.BytesToHash(account.CodeHash)
 	}
 	if acct.Root == (common.Hash{}) {
 		acct.Root = types.EmptyRootHash
