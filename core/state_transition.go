@@ -19,6 +19,9 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,8 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
-	"math"
-	"math/big"
 )
 
 // ExecutionResult includes all output after executing given evm
@@ -527,7 +528,6 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	peakGasUsed := st.gasUsed()
 
 	// Compute refund counter, capped to a refund quotient.
-	gasBeforeRefunds := peakGasUsed
 	st.gasRemaining += st.calcRefund()
 	if rules.IsPrague {
 		// After EIP-7623: Data-heavy transactions pay the floor gas.
@@ -542,7 +542,14 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 			peakGasUsed = floorDataGas
 		}
 	}
-	st.returnGas(rules, gasBeforeRefunds)
+	// Return gas to the user
+	st.returnGas()
+	// Return gas to the gas pool
+	if rules.IsAmsterdam {
+		st.gp.AddGas(st.initialGas - peakGasUsed)
+	} else {
+		st.gp.AddGas(st.gasRemaining)
+	}
 
 	effectiveTip := msg.GasPrice
 	if rules.IsLondon {
@@ -662,22 +669,13 @@ func (st *stateTransition) calcRefund() uint64 {
 
 // returnGas returns ETH for remaining gas,
 // exchanged at the original rate.
-func (st *stateTransition) returnGas(rules params.Rules, gasBeforeRefunds uint64) {
+func (st *stateTransition) returnGas() {
 	remaining := uint256.NewInt(st.gasRemaining)
 	remaining.Mul(remaining, uint256.MustFromBig(st.msg.GasPrice))
 	st.state.AddBalance(st.msg.From, remaining, tracing.BalanceIncreaseGasReturn)
 
 	if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnGasChange != nil && st.gasRemaining > 0 {
 		st.evm.Config.Tracer.OnGasChange(st.gasRemaining, 0, tracing.GasChangeTxLeftOverReturned)
-	}
-
-	if !rules.IsAmsterdam {
-		// Pre-Amsterdam return remaining gas to the block gas counter so it is
-		// available for the next transaction.
-		st.gp.AddGas(st.gasRemaining)
-	} else {
-		// Post-Amsterdam only return the remaining gas minus the refunds.
-		st.gp.AddGas(gasBeforeRefunds)
 	}
 }
 
