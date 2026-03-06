@@ -435,11 +435,11 @@ func (in *inspector) inspect(trie *Trie, n node, height uint32, path []byte, sta
 		in.inspect(trie, n.Val, height+1, nextPath, stat)
 	case *fullNode:
 		for idx, child := range n.Children {
-			if child == nil {
+			if child.isEmpty() {
 				continue
 			}
 			childPath := slices.Concat(path, []byte{byte(idx)})
-			childNode := child
+			childNode := child.toNode()
 			if in.trySpawn(&wg, func() {
 				in.inspect(trie, childNode, height+1, childPath, stat)
 			}) {

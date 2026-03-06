@@ -593,9 +593,9 @@ func (s *Sync) children(req *nodeRequest, object node) ([]*nodeRequest, error) {
 		}
 	case *fullNode:
 		for i := 0; i < 17; i++ {
-			if node.Children[i] != nil {
+			if !node.Children[i].isEmpty() {
 				children = append(children, childNode{
-					node: node.Children[i],
+					node: node.Children[i].toNode(),
 					path: append(slices.Clone(req.path), byte(i)),
 				})
 			}

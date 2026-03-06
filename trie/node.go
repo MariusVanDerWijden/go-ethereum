@@ -34,9 +34,56 @@ type node interface {
 	fstring(string) string
 }
 
+// childRef represents a reference to a child node in a fullNode.
+// It avoids interface boxing for the common case of hash references,
+// significantly reducing allocations during trie traversal.
+//
+// The zero value represents a nil/empty child.
+// If hash is non-zero, this is a hash reference (no heap allocation needed).
+// If node is non-nil, this is an embedded node or value node.
+type childRef struct {
+	hash common.Hash // Non-zero if this is a hash reference
+	node node        // Non-nil if this is an embedded/resolved node
+}
+
+// isHash returns true if this is a hash reference.
+func (c childRef) isHash() bool {
+	return c.hash != (common.Hash{}) && c.node == nil
+}
+
+// isEmpty returns true if this child slot is empty.
+func (c childRef) isEmpty() bool {
+	return c.hash == (common.Hash{}) && c.node == nil
+}
+
+// toNode converts childRef to a node interface.
+// Returns nil for empty refs, hashNode for hash refs, or the embedded node.
+func (c childRef) toNode() node {
+	if c.node != nil {
+		return c.node
+	}
+	if c.hash != (common.Hash{}) {
+		return hashNode(c.hash[:])
+	}
+	return nil
+}
+
+// childRefFromNode creates a childRef from a node interface.
+func childRefFromNode(n node) childRef {
+	if n == nil {
+		return childRef{}
+	}
+	if hn, ok := n.(hashNode); ok {
+		var h common.Hash
+		copy(h[:], hn)
+		return childRef{hash: h}
+	}
+	return childRef{node: n}
+}
+
 type (
 	fullNode struct {
-		Children [17]node // Actual trie node data to encode/decode (needs custom encoder)
+		Children [17]childRef // Actual trie node data to encode/decode (needs custom encoder)
 		flags    nodeFlag
 	}
 	shortNode struct {
@@ -102,11 +149,11 @@ func (n valueNode) String() string  { return n.fstring("") }
 
 func (n *fullNode) fstring(ind string) string {
 	resp := fmt.Sprintf("[\n%s  ", ind)
-	for i, node := range &n.Children {
-		if node == nil {
+	for i, child := range &n.Children {
+		if child.isEmpty() {
 			resp += fmt.Sprintf("%s: <nil> ", indices[i])
 		} else {
-			resp += fmt.Sprintf("%s: %v", indices[i], node.fstring(ind+"  "))
+			resp += fmt.Sprintf("%s: %v", indices[i], child.toNode().fstring(ind+"  "))
 		}
 	}
 	return resp + fmt.Sprintf("\n%s] ", ind)
@@ -195,7 +242,7 @@ func decodeShort(hash, elems []byte) (node, error) {
 	if err != nil {
 		return nil, wrapError(err, "val")
 	}
-	return &shortNode{key, r, flag}, nil
+	return &shortNode{key, r.toNode(), flag}, nil
 }
 
 func decodeFull(hash, elems []byte) (*fullNode, error) {
@@ -212,17 +259,19 @@ func decodeFull(hash, elems []byte) (*fullNode, error) {
 		return n, err
 	}
 	if len(val) > 0 {
-		n.Children[16] = valueNode(val)
+		n.Children[16] = childRef{node: valueNode(val)}
 	}
 	return n, nil
 }
 
 const hashLen = len(common.Hash{})
 
-func decodeRef(buf []byte) (node, []byte, error) {
+// decodeRef parses a node reference, returning a childRef that avoids
+// interface boxing for hash references.
+func decodeRef(buf []byte) (childRef, []byte, error) {
 	kind, val, rest, err := rlp.Split(buf)
 	if err != nil {
-		return nil, buf, err
+		return childRef{}, buf, err
 	}
 	switch {
 	case kind == rlp.List:
@@ -230,19 +279,22 @@ func decodeRef(buf []byte) (node, []byte, error) {
 		// than a hash in order to be valid.
 		if size := len(buf) - len(rest); size >= hashLen {
 			err := fmt.Errorf("oversized embedded node (size is %d bytes, want size < %d)", size, hashLen)
-			return nil, buf, err
+			return childRef{}, buf, err
 		}
 		// The buffer content has already been copied or is safe to use;
 		// no additional copy is required.
 		n, err := decodeNodeUnsafe(nil, buf)
-		return n, rest, err
+		return childRef{node: n}, rest, err
 	case kind == rlp.String && len(val) == 0:
 		// empty node
-		return nil, rest, nil
+		return childRef{}, rest, nil
 	case kind == rlp.String && len(val) == 32:
-		return hashNode(val), rest, nil
+		// Hash reference - store inline without allocation
+		var h common.Hash
+		copy(h[:], val)
+		return childRef{hash: h}, rest, nil
 	default:
-		return nil, nil, fmt.Errorf("invalid RLP string size %d (want 0 or 32)", len(val))
+		return childRef{}, nil, fmt.Errorf("invalid RLP string size %d (want 0 or 32)", len(val))
 	}
 }
 

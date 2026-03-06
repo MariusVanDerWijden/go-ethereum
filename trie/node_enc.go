@@ -31,10 +31,12 @@ func nodeToBytes(n node) []byte {
 func (n *fullNode) encode(w rlp.EncoderBuffer) {
 	offset := w.List()
 	for _, c := range n.Children {
-		if c != nil {
-			c.encode(w)
-		} else {
+		if c.isEmpty() {
 			w.Write(rlp.EmptyString)
+		} else if c.isHash() {
+			w.WriteBytes(c.hash[:])
+		} else {
+			c.node.encode(w)
 		}
 	}
 	w.ListEnd(offset)

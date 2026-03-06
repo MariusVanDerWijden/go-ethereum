@@ -93,20 +93,20 @@ func (c *committer) commitChildren(path []byte, n *fullNode, parallel bool) {
 	)
 	for i := 0; i < 16; i++ {
 		child := n.Children[i]
-		if child == nil {
+		if child.isEmpty() {
 			continue
 		}
 		// If it's the hashed child, save the hash value directly.
 		// Note: it's impossible that the child in range [0, 15]
 		// is a valueNode.
-		if _, ok := child.(hashNode); ok {
+		if child.isHash() {
 			continue
 		}
 		// Commit the child recursively and store the "hashed" value.
 		// Note the returned node can be some embedded nodes, so it's
 		// possible the type is not hashNode.
 		if !parallel {
-			n.Children[i] = c.commit(append(path, byte(i)), child, false)
+			n.Children[i] = childRefFromNode(c.commit(append(path, byte(i)), child.node, false))
 		} else {
 			wg.Add(1)
 			go func(index int) {
@@ -115,7 +115,7 @@ func (c *committer) commitChildren(path []byte, n *fullNode, parallel bool) {
 				p := append(path, byte(index))
 				childSet := trienode.NewNodeSet(c.nodes.Owner)
 				childCommitter := newCommitter(childSet, c.tracer, c.collectLeaf)
-				n.Children[index] = childCommitter.commit(p, child, false)
+				n.Children[index] = childRefFromNode(childCommitter.commit(p, n.Children[index].node, false))
 
 				nodesMu.Lock()
 				c.nodes.MergeDisjoint(childSet)
@@ -178,7 +178,12 @@ func forGatherChildren(n node, onChild func(hash common.Hash)) {
 		forGatherChildren(n.Val, onChild)
 	case *fullNode:
 		for i := 0; i < 16; i++ {
-			forGatherChildren(n.Children[i], onChild)
+			child := n.Children[i]
+			if child.isHash() {
+				onChild(child.hash)
+			} else if !child.isEmpty() {
+				forGatherChildren(child.node, onChild)
+			}
 		}
 	case hashNode:
 		onChild(common.BytesToHash(n))

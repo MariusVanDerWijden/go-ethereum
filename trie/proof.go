@@ -59,7 +59,7 @@ func (t *Trie) Prove(key []byte, proofDb ethdb.KeyValueWriter) error {
 			}
 			nodes = append(nodes, n)
 		case *fullNode:
-			tn = n.Children[key[0]]
+			tn = n.Children[key[0]].toNode()
 			prefix = append(prefix, key[0])
 			key = key[1:]
 			nodes = append(nodes, n)
@@ -199,7 +199,7 @@ func proofToPath(rootHash common.Hash, root node, key []byte, proofDb ethdb.KeyV
 		case *shortNode:
 			pnode.Val = child
 		case *fullNode:
-			pnode.Children[key[0]] = child
+			pnode.Children[key[0]] = childRefFromNode(child)
 		default:
 			panic(fmt.Sprintf("%T: invalid node: %v", pnode, pnode))
 		}
@@ -264,12 +264,12 @@ findFork:
 
 			// If either the node pointed by left proof or right proof is nil,
 			// stop here and the forkpoint is the fullnode.
-			leftnode, rightnode := rn.Children[left[pos]], rn.Children[right[pos]]
-			if leftnode == nil || rightnode == nil || leftnode != rightnode {
+			leftchild, rightchild := rn.Children[left[pos]], rn.Children[right[pos]]
+			if leftchild.isEmpty() || rightchild.isEmpty() || leftchild != rightchild {
 				break findFork
 			}
 			parent = n
-			n, pos = rn.Children[left[pos]], pos+1
+			n, pos = leftchild.toNode(), pos+1
 		default:
 			panic(fmt.Sprintf("%T: invalid node: %v", n, n))
 		}
@@ -293,7 +293,7 @@ findFork:
 			if parent == nil {
 				return true, nil
 			}
-			parent.(*fullNode).Children[left[pos-1]] = nil
+			parent.(*fullNode).Children[left[pos-1]] = childRef{}
 			return false, nil
 		}
 		// Only one proof points to non-existent key.
@@ -303,7 +303,7 @@ findFork:
 				if parent == nil {
 					return true, nil
 				}
-				parent.(*fullNode).Children[left[pos-1]] = nil
+				parent.(*fullNode).Children[left[pos-1]] = childRef{}
 				return false, nil
 			}
 			return false, unset(rn, rn.Val, left[pos:], len(rn.Key), false)
@@ -314,7 +314,7 @@ findFork:
 				if parent == nil {
 					return true, nil
 				}
-				parent.(*fullNode).Children[right[pos-1]] = nil
+				parent.(*fullNode).Children[right[pos-1]] = childRef{}
 				return false, nil
 			}
 			return false, unset(rn, rn.Val, right[pos:], len(rn.Key), true)
@@ -323,12 +323,12 @@ findFork:
 	case *fullNode:
 		// unset all internal nodes in the forkpoint
 		for i := left[pos] + 1; i < right[pos]; i++ {
-			rn.Children[i] = nil
+			rn.Children[i] = childRef{}
 		}
-		if err := unset(rn, rn.Children[left[pos]], left[pos:], 1, false); err != nil {
+		if err := unset(rn, rn.Children[left[pos]].toNode(), left[pos:], 1, false); err != nil {
 			return false, err
 		}
-		if err := unset(rn, rn.Children[right[pos]], right[pos:], 1, true); err != nil {
+		if err := unset(rn, rn.Children[right[pos]].toNode(), right[pos:], 1, true); err != nil {
 			return false, err
 		}
 		return false, nil
@@ -354,16 +354,16 @@ func unset(parent node, child node, key []byte, pos int, removeLeft bool) error 
 	case *fullNode:
 		if removeLeft {
 			for i := 0; i < int(key[pos]); i++ {
-				cld.Children[i] = nil
+				cld.Children[i] = childRef{}
 			}
 			cld.flags = nodeFlag{dirty: true}
 		} else {
 			for i := key[pos] + 1; i < 16; i++ {
-				cld.Children[i] = nil
+				cld.Children[i] = childRef{}
 			}
 			cld.flags = nodeFlag{dirty: true}
 		}
-		return unset(cld, cld.Children[key[pos]], key, pos+1, removeLeft)
+		return unset(cld, cld.Children[key[pos]].toNode(), key, pos+1, removeLeft)
 	case *shortNode:
 		if !bytes.HasPrefix(key[pos:], cld.Key) {
 			// Find the fork point, it's a non-existent branch.
@@ -373,7 +373,7 @@ func unset(parent node, child node, key []byte, pos int, removeLeft bool) error 
 					// (it belongs to the range), unset the entire
 					// branch. The parent must be a fullnode.
 					fn := parent.(*fullNode)
-					fn.Children[key[pos-1]] = nil
+					fn.Children[key[pos-1]] = childRef{}
 				}
 				//else {
 				// The key of fork shortnode is greater than the
@@ -386,7 +386,7 @@ func unset(parent node, child node, key []byte, pos int, removeLeft bool) error 
 					// path(it belongs to the range), unset the entries
 					// branch. The parent must be a fullnode.
 					fn := parent.(*fullNode)
-					fn.Children[key[pos-1]] = nil
+					fn.Children[key[pos-1]] = childRef{}
 				}
 				//else {
 				// The key of fork shortnode is less than the
@@ -398,7 +398,7 @@ func unset(parent node, child node, key []byte, pos int, removeLeft bool) error 
 		}
 		if _, ok := cld.Val.(valueNode); ok {
 			fn := parent.(*fullNode)
-			fn.Children[key[pos-1]] = nil
+			fn.Children[key[pos-1]] = childRef{}
 			return nil
 		}
 		cld.flags = nodeFlag{dirty: true}
@@ -422,11 +422,11 @@ func hasRightElement(node node, key []byte) bool {
 		switch rn := node.(type) {
 		case *fullNode:
 			for i := key[pos] + 1; i < 16; i++ {
-				if rn.Children[i] != nil {
+				if !rn.Children[i].isEmpty() {
 					return true
 				}
 			}
-			node, pos = rn.Children[key[pos]], pos+1
+			node, pos = rn.Children[key[pos]].toNode(), pos+1
 		case *shortNode:
 			if !bytes.HasPrefix(key[pos:], rn.Key) {
 				return bytes.Compare(rn.Key, key[pos:]) > 0
@@ -610,7 +610,7 @@ func get(tn node, key []byte, skipResolved bool) ([]byte, node) {
 				return key, tn
 			}
 		case *fullNode:
-			tn = n.Children[key[0]]
+			tn = n.Children[key[0]].toNode()
 			key = key[1:]
 			if !skipResolved {
 				return key, tn

@@ -141,28 +141,39 @@ func (h *hasher) encodeFullNode(n *fullNode) []byte {
 	if h.parallel {
 		var wg sync.WaitGroup
 		for i := 0; i < 16; i++ {
-			if n.Children[i] == nil {
+			child := n.Children[i]
+			if child.isEmpty() {
 				continue
 			}
 			wg.Add(1)
-			go func(i int) {
+			go func(i int, child childRef) {
 				defer wg.Done()
 
 				h := newHasher(false)
-				fn.Children[i] = h.hash(n.Children[i], false)
+				if child.isHash() {
+					fn.Children[i] = child.hash[:]
+				} else {
+					fn.Children[i] = h.hash(child.node, false)
+				}
 				returnHasherToPool(h)
-			}(i)
+			}(i, child)
 		}
 		wg.Wait()
 	} else {
 		for i := 0; i < 16; i++ {
-			if child := n.Children[i]; child != nil {
-				fn.Children[i] = h.hash(child, false)
+			child := n.Children[i]
+			if child.isEmpty() {
+				continue
+			}
+			if child.isHash() {
+				fn.Children[i] = child.hash[:]
+			} else {
+				fn.Children[i] = h.hash(child.node, false)
 			}
 		}
 	}
-	if n.Children[16] != nil {
-		fn.Children[16] = n.Children[16].(valueNode)
+	if !n.Children[16].isEmpty() {
+		fn.Children[16] = n.Children[16].node.(valueNode)
 	}
 	fn.encode(h.encbuf)
 	fnEncoderPool.Put(fn)

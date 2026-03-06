@@ -206,9 +206,9 @@ func (t *Trie) get(origNode node, key []byte, pos int) (value []byte, newnode no
 		}
 		return value, n, didResolve, err
 	case *fullNode:
-		value, newnode, didResolve, err = t.get(n.Children[key[pos]], key, pos+1)
+		value, newnode, didResolve, err = t.get(n.Children[key[pos]].toNode(), key, pos+1)
 		if err == nil && didResolve {
-			n.Children[key[pos]] = newnode
+			n.Children[key[pos]] = childRefFromNode(newnode)
 		}
 		return value, n, didResolve, err
 	case hashNode:
@@ -254,9 +254,9 @@ func (t *Trie) Prefetch(keylist [][]byte) error {
 	for pos, ks := range keys {
 		eg.Go(func() error {
 			for _, k := range ks {
-				_, newnode, didResolve, err := t.get(fn.Children[pos], k, 1)
+				_, newnode, didResolve, err := t.get(fn.Children[pos].toNode(), k, 1)
 				if err == nil && didResolve {
-					fn.Children[pos] = newnode
+					fn.Children[pos] = childRefFromNode(newnode)
 				}
 				if err != nil {
 					return err
@@ -338,9 +338,9 @@ func (t *Trie) getNode(origNode node, path []byte, pos int) (item []byte, newnod
 		return item, n, resolved, err
 
 	case *fullNode:
-		item, newnode, resolved, err = t.getNode(n.Children[path[pos]], path, pos+1)
+		item, newnode, resolved, err = t.getNode(n.Children[path[pos]].toNode(), path, pos+1)
 		if err == nil && resolved > 0 {
-			n.Children[path[pos]] = newnode
+			n.Children[path[pos]] = childRefFromNode(newnode)
 		}
 		return item, n, resolved, err
 
@@ -424,14 +424,17 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// Otherwise branch out at the index where they differ.
 		branch := &fullNode{flags: t.newFlag()}
 		var err error
-		_, branch.Children[n.Key[matchlen]], err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], n.Val)
+		var nn node
+		_, nn, err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], n.Val)
 		if err != nil {
 			return false, nil, err
 		}
-		_, branch.Children[key[matchlen]], err = t.insert(nil, append(prefix, key[:matchlen+1]...), key[matchlen+1:], value)
+		branch.Children[n.Key[matchlen]] = childRefFromNode(nn)
+		_, nn, err = t.insert(nil, append(prefix, key[:matchlen+1]...), key[matchlen+1:], value)
 		if err != nil {
 			return false, nil, err
 		}
+		branch.Children[key[matchlen]] = childRefFromNode(nn)
 		// Replace this shortNode with the branch if it occurs at index 0.
 		if matchlen == 0 {
 			return true, branch, nil
@@ -445,12 +448,12 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		return true, &shortNode{key[:matchlen], branch, t.newFlag()}, nil
 
 	case *fullNode:
-		dirty, nn, err := t.insert(n.Children[key[0]], append(prefix, key[0]), key[1:], value)
+		dirty, nn, err := t.insert(n.Children[key[0]].toNode(), append(prefix, key[0]), key[1:], value)
 		if !dirty || err != nil {
 			return false, n, err
 		}
 		n.flags = t.newFlag()
-		n.Children[key[0]] = nn
+		n.Children[key[0]] = childRefFromNode(nn)
 		return true, n, nil
 
 	case nil:
@@ -552,12 +555,12 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 		}
 
 	case *fullNode:
-		dirty, nn, err := t.delete(n.Children[key[0]], append(prefix, key[0]), key[1:])
+		dirty, nn, err := t.delete(n.Children[key[0]].toNode(), append(prefix, key[0]), key[1:])
 		if !dirty || err != nil {
 			return false, n, err
 		}
 		n.flags = t.newFlag()
-		n.Children[key[0]] = nn
+		n.Children[key[0]] = childRefFromNode(nn)
 
 		// Because n is a full node, it must've contained at least two children
 		// before the delete operation. If the new child value is non-nil, n still
@@ -578,7 +581,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 		// values.
 		pos := -1
 		for i, cld := range &n.Children {
-			if cld != nil {
+			if !cld.isEmpty() {
 				if pos == -1 {
 					pos = i
 				} else {
@@ -595,7 +598,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 				// shortNode{..., shortNode{...}}.  Since the entry
 				// might not be loaded yet, resolve it just for this
 				// check.
-				cnode, err := t.resolve(n.Children[pos], append(prefix, byte(pos)))
+				cnode, err := t.resolve(n.Children[pos].toNode(), append(prefix, byte(pos)))
 				if err != nil {
 					return false, nil, err
 				}
@@ -611,7 +614,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			}
 			// Otherwise, n is replaced by a one-nibble short node
 			// containing the child.
-			return true, &shortNode{[]byte{byte(pos)}, n.Children[pos], t.newFlag()}, nil
+			return true, &shortNode{[]byte{byte(pos)}, n.Children[pos].toNode(), t.newFlag()}, nil
 		}
 		// n still contains at least two values and cannot be reduced.
 		return true, n, nil
@@ -656,9 +659,9 @@ func copyNode(n node) node {
 			Val:   copyNode(n.Val),
 		}
 	case *fullNode:
-		var children [17]node
+		var children [17]childRef
 		for i, cn := range n.Children {
-			children[i] = copyNode(cn)
+			children[i] = childRefFromNode(copyNode(cn.toNode()))
 		}
 		return &fullNode{
 			flags:    n.flags.copy(),

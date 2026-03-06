@@ -449,8 +449,9 @@ func (it *nodeIterator) findChild(n *fullNode, index int, ancestor common.Hash) 
 		childPath []byte
 	)
 	for ; index < len(n.Children); index = nextChildIndex(index) {
-		if n.Children[index] != nil {
-			child = n.Children[index]
+		childRef := n.Children[index]
+		if !childRef.isEmpty() {
+			child = childRef.toNode()
 			hash, _ := child.cache()
 
 			state = it.getFromPool()
