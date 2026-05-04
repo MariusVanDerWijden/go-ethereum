@@ -267,7 +267,6 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 		return nil, gas, GasUsed{}, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
-
 	p, isPrecompile := evm.precompile(addr)
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP4762 && !isSystemCall(caller) {
@@ -327,8 +326,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
-		isRevert := err == ErrExecutionReverted
-		if !isRevert {
+		if err != ErrExecutionReverted {
 			if evm.Config.Tracer != nil && evm.Config.Tracer.OnGasChange != nil {
 				evm.Config.Tracer.OnGasChange(gas.RegularGas, 0, tracing.GasChangeCallFailedExecution)
 			}
@@ -389,8 +387,7 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
-		isRevert := err == ErrExecutionReverted
-		if !isRevert {
+		if err != ErrExecutionReverted {
 			if evm.Config.Tracer != nil && evm.Config.Tracer.OnGasChange != nil {
 				evm.Config.Tracer.OnGasChange(gas.RegularGas, 0, tracing.GasChangeCallFailedExecution)
 			}
@@ -444,8 +441,7 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
-		isRevert := err == ErrExecutionReverted
-		if !isRevert {
+		if err != ErrExecutionReverted {
 			if evm.Config.Tracer != nil && evm.Config.Tracer.OnGasChange != nil {
 				evm.Config.Tracer.OnGasChange(gas.RegularGas, 0, tracing.GasChangeCallFailedExecution)
 			}
@@ -477,8 +473,17 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, GasUsed{}, ErrDepth
 	}
+	// We take a snapshot here. This is a bit counter-intuitive, and could probably be skipped.
+	// However, even a staticcall is considered a 'touch'. On mainnet, static calls were introduced
+	// after all empty accounts were deleted, so this is not required. However, if we omit this,
+	// then certain tests start failing; stRevertTest/RevertPrecompiledTouchExactOOG.json.
+	// We could change this, but for now it's left for legacy reasons
 	var snapshot = evm.StateDB.Snapshot()
 
+	// We do an AddBalance of zero here, just in order to trigger a touch.
+	// This doesn't matter on Mainnet, where all empties are gone at the time of Byzantium,
+	// but is the correct thing to do and matters on other networks, in tests, and potential
+	// future scenarios
 	evm.StateDB.AddBalance(addr, new(uint256.Int), tracing.BalanceChangeTouchAccount)
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
@@ -498,8 +503,7 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 	}
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
-		isRevert := err == ErrExecutionReverted
-		if !isRevert {
+		if err != ErrExecutionReverted {
 			if evm.Config.Tracer != nil && evm.Config.Tracer.OnGasChange != nil {
 				evm.Config.Tracer.OnGasChange(gas.RegularGas, 0, tracing.GasChangeCallFailedExecution)
 			}
@@ -585,7 +589,6 @@ func (evm *EVM) create(caller common.Address, code []byte, gas GasBudget, value 
 	// It might be possible the contract code is deployed to a pre-existent
 	// account with non-zero balance.
 	snapshot := evm.StateDB.Snapshot()
-
 	if !evm.StateDB.Exist(address) {
 		evm.StateDB.CreateAccount(address)
 	}
@@ -654,8 +657,7 @@ func (evm *EVM) initNewContract(contract *Contract, address common.Address) ([]b
 		if err := CheckMaxCodeSize(&evm.chainRules, uint64(len(ret))); err != nil {
 			return ret, err
 		}
-		// EIP-8037: Charge regular gas (keccak256 hash) first, then state gas
-		// (code storage). Regular-before-state prevents reservoir inflation.
+		// Charge regular gas before state gas.
 		regularGas := GasCosts{RegularGas: toWordSize(uint64(len(ret))) * params.Keccak256WordGas}
 		if !contract.UseGas(regularGas, evm.Config.Tracer, tracing.GasChangeCallCodeStorage) {
 			return ret, ErrCodeStoreOutOfGas

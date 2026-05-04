@@ -43,7 +43,7 @@ type Contract struct {
 	IsSystemCall bool
 
 	Gas     GasBudget
-	GasUsed GasUsed // EIP-8037: canonical per-frame gas usage accumulator
+	GasUsed GasUsed
 	value   *uint256.Int
 }
 
@@ -155,7 +155,7 @@ func (c *Contract) RefundGas(err error, initialRegularGasUsed uint64, gas GasBud
 			gas.StateGasRefund = 0
 		}
 	}
-	if gas.RegularGas == 0 && gas.StateGas == 0 && gasUsed.StateGas == 0 && gasUsed.RegularGas == 0 && gas.StateGasRefund == 0 {
+	if gas.isZero() && gasUsed.isZero() {
 		return
 	}
 	if logger != nil && logger.OnGasChange != nil && reason != tracing.GasChangeIgnored {

@@ -651,8 +651,8 @@ func opCreate(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 		value        = scope.Stack.pop()
 		offset, size = scope.Stack.pop(), scope.Stack.pop()
 		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
+		gas          = scope.Contract.Gas
 	)
-	gas := scope.Contract.Gas
 	if evm.chainRules.IsEIP150 {
 		gas.RegularGas -= gas.RegularGas / 64
 	}
@@ -695,10 +695,10 @@ func opCreate2(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 		offset, size = scope.Stack.pop(), scope.Stack.pop()
 		salt         = scope.Stack.pop()
 		input        = scope.Memory.GetCopy(offset.Uint64(), size.Uint64())
+		gas          = scope.Contract.Gas
 	)
 
 	// Apply EIP150
-	gas := scope.Contract.Gas
 	gas.RegularGas -= gas.RegularGas / 64
 
 	regularGasUsed := scope.Contract.GasUsed.RegularGas
@@ -715,7 +715,6 @@ func opCreate2(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, error) {
 		stackvalue.SetBytes(addr.Bytes())
 	}
 	scope.Stack.push(&stackvalue)
-
 	scope.Contract.RefundGas(suberr, regularGasUsed, returnGas, childGasUsed, evm.Config.Tracer, tracing.GasChangeCallLeftOverRefunded)
 	if evm.chainRules.IsAmsterdam && suberr != nil {
 		scope.Contract.RefundCreateStateGas(params.AccountCreationSize * evm.Context.CostPerGasByte)

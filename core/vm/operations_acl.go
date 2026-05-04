@@ -283,8 +283,6 @@ func gasCallEIP7702(evm *EVM, contract *Contract, stack *Stack, mem *Memory, mem
 }
 
 func gasCallEIP8037(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (GasCosts, error) {
-	// Same write-protection guard as gasCallEIP7702: check before any gas
-	// charging to avoid incorrectly recording in the access list.
 	transfersValue := !stack.back(2).IsZero()
 	if evm.readOnly && transfersValue {
 		return GasCosts{}, ErrWriteProtection

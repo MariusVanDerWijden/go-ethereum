@@ -30,6 +30,10 @@ func (g *GasUsed) Add(costs GasCosts) {
 	g.StateGas += int64(costs.StateGas)
 }
 
+func (g *GasUsed) isZero() bool {
+	return g.RegularGas == 0 && g.StateGas == 0
+}
+
 // GasCosts denotes a vector of gas costs in the
 // multidimensional metering paradigm. It represents the cost
 // charged by an individual operation.
@@ -70,6 +74,10 @@ func NewGasBudget(regular, state uint64) GasBudget {
 	return GasBudget{RegularGas: regular, StateGas: state}
 }
 
+func (g *GasBudget) isZero() bool {
+	return g.RegularGas == 0 && g.StateGas == 0 && g.StateGasRefund == 0
+}
+
 // Used returns the total amount of gas consumed so far (regular + state).
 func (g GasBudget) Used(initial GasBudget) uint64 {
 	return (initial.RegularGas + initial.StateGas) - (g.RegularGas + g.StateGas)
@@ -80,12 +88,9 @@ func (g *GasBudget) Exhaust() {
 	g.RegularGas = 0
 }
 
-// HaltReset resets the frame to (0, initialStateGas) on exceptional halt:
-// regular gas is burned and the reservoir is restored to its value at frame
-// entry. Any state gas above R0 — either spill that drained the reservoir, or
-// state refunded above R0 by a child revert — is re-classified as regular and
-// added to gasUsed.RegularGas. gasUsed.StateGas is cleared so the parent's
-// reservoir is left unchanged when this frame's leftover propagates upward.
+// HaltReset resets the frame to (0, initialStateGas) on exceptional halt.
+// Regular gas is burned and state gas is set to the initialGas since
+// all state changes were reverted.
 func (g *GasBudget) HaltReset(gasUsed *GasUsed, initialStateGas uint64) {
 	gasUsed.RegularGas += g.RegularGas
 	if gasUsed.StateGas > int64(initialStateGas) {

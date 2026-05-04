@@ -28,8 +28,8 @@ type GasPool struct {
 	initial        uint64
 	cumulativeUsed uint64
 
-	// EIP-8037: per-dimension cumulative sums for Amsterdam.
-	// Block gas used = max(cumulativeRegular, cumulativeState).
+	// After 8037 Block gas used is
+	// max(cumulativeRegular, cumulativeState).
 	cumulativeRegular uint64
 	cumulativeState   uint64
 }
@@ -85,8 +85,7 @@ func (gp *GasPool) ReturnGasAmsterdam(txRegular, txState, receiptGasUsed uint64)
 		return fmt.Errorf("%w: block gas overflow: initial %d, used %d (regular: %d, state: %d)",
 			ErrGasLimitReached, gp.initial, blockUsed, gp.cumulativeRegular, gp.cumulativeState)
 	}
-	// TX inclusion: only the regular dimension is checked when deciding
-	// whether the next transaction fits.
+	// For tx inclusion, we only check if the regular dimension fits.
 	gp.remaining = gp.initial - gp.cumulativeRegular
 	return nil
 }
@@ -97,16 +96,14 @@ func (gp *GasPool) Gas() uint64 {
 }
 
 // CumulativeUsed returns the cumulative gas consumed for receipt tracking.
-// For Amsterdam blocks, this is the sum of per-tx tx_gas_used_after_refund
-// (what users pay), not the 2D block-level metric.
 func (gp *GasPool) CumulativeUsed() uint64 {
 	return gp.cumulativeUsed
 }
 
-// Used returns the amount of consumed gas. For Amsterdam blocks with
-// 2D gas accounting (EIP-8037), returns max(sum_regular, sum_state).
+// Used returns the amount of consumed gas.
 func (gp *GasPool) Used() uint64 {
 	if gp.cumulativeRegular > 0 || gp.cumulativeState > 0 {
+		// After 8037 we return max(sum_regular, sum_state)
 		return max(gp.cumulativeRegular, gp.cumulativeState)
 	}
 	if gp.initial < gp.remaining {

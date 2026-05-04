@@ -90,7 +90,7 @@ func CostPerStateByte(header *types.Header, config *params.ChainConfig) uint64 {
 	if !config.IsAmsterdam(header.Number, header.Time) {
 		return 0
 	}
-	return 1174 // Fixed cost for devnet-4
+	return params.CostPerStateByte
 }
 
 // NewEVMTxContext creates a new transaction context for a single transaction.
