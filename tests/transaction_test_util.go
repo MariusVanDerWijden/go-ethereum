@@ -80,8 +80,9 @@ func (tt *TransactionTest) Run() error {
 		if err != nil {
 			return
 		}
-		// Intrinsic gas
-		cost, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.SetCodeAuthorizations(), tx.To() == nil, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
+		// Intrinsic cost
+		// TODO (MariusVanDerWijden): correctly set this for post-amsterdam tests.
+		cost, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.SetCodeAuthorizations(), tx.To() == nil, rules, 0)
 		if err != nil {
 			return
 		}
@@ -92,7 +93,7 @@ func (tt *TransactionTest) Run() error {
 
 		if rules.IsPrague {
 			var floorDataGas uint64
-			floorDataGas, err = core.FloorDataGas(rules, tx.Data())
+			floorDataGas, err = core.FloorDataGas(rules, tx.Data(), tx.AccessList())
 			if err != nil {
 				return
 			}
