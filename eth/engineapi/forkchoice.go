@@ -26,9 +26,9 @@ import (
 
 // handleForkchoice implements POST /engine/v2/{fork}/forkchoice.
 func (rt *Router) handleForkchoice(w http.ResponseWriter, r *http.Request, fork forks.Fork) {
-	// The execution-apis spec currently only defines the forkchoice envelope
-	// for Amsterdam; the inner attributes shape is fork-driven by the codec.
-	sf, ok := resolveFork(w, fork, forks.Amsterdam)
+	// The Amsterdam forkchoice envelope is the universal wire shape; the inner
+	// attributes are fork-driven by the codec down to Paris.
+	sf, ok := resolveFork(w, fork, forks.Paris)
 	if !ok {
 		return
 	}
@@ -48,11 +48,9 @@ func (rt *Router) handleForkchoice(w http.ResponseWriter, r *http.Request, fork 
 			writeProblem(w, http.StatusBadRequest, ErrInvalidAttributes, err.Error())
 			return
 		}
-		// If PayloadAttributes is present the URL fork MUST match the fork
-		// the new payload would belong to. Today only Amsterdam URL exists
-		// in this implementation so the timestamp check is implicit; we
-		// keep an explicit guard for future fork URLs.
-		if rt.backend.ForkFromTimestamp(attr.Timestamp) != fork {
+		// The URL fork must match the fork of the payload being built; collapse
+		// BPO forks onto their base fork since they share an engine-API URL.
+		if baseEngineFork(rt.backend.ForkFromTimestamp(attr.Timestamp)) != fork {
 			writeProblem(w, http.StatusBadRequest, ErrUnsupportedFork,
 				"payload_attributes timestamp does not match URL fork")
 			return
@@ -64,7 +62,7 @@ func (rt *Router) handleForkchoice(w http.ResponseWriter, r *http.Request, fork 
 		// underlying miner gains the corresponding setting.
 	}
 
-	resp, err := rt.backend.ForkchoiceUpdated(r.Context(), state, attrs, engine.PayloadV4)
+	resp, err := rt.backend.ForkchoiceUpdated(r.Context(), state, attrs, payloadVersionForFork(fork))
 	if err != nil {
 		mapBackendErr(w, err)
 		return
@@ -80,4 +78,18 @@ func (rt *Router) handleForkchoice(w http.ResponseWriter, r *http.Request, fork 
 		out.PayloadID = [][8]byte{[8]byte(*resp.PayloadID)}
 	}
 	writeSSZResponse(w, out, sf)
+}
+
+// payloadVersionForFork maps a fork to its forkchoiceUpdated PayloadVersion.
+func payloadVersionForFork(f forks.Fork) engine.PayloadVersion {
+	switch {
+	case f >= forks.Amsterdam:
+		return engine.PayloadV4
+	case f >= forks.Cancun:
+		return engine.PayloadV3
+	case f >= forks.Shanghai:
+		return engine.PayloadV2
+	default:
+		return engine.PayloadV1
+	}
 }

@@ -125,23 +125,27 @@ type ForkchoiceUpdateAmsterdam struct {
 }
 
 func (f *ForkchoiceUpdateAmsterdam) SizeSSZ(siz *ssz.Sizer, fixed bool) uint32 {
-	// 96 (state) + 4(offset attrs) + 4(offset custody)
-	size := uint32(96 + 8)
+	size := uint32(96 + 4) // state + attrs offset
+	if siz.Fork() >= forkAmsterdam {
+		size += 4 // custody offset (Amsterdam+)
+	}
 	if fixed {
 		return size
 	}
 	size += ssz.SizeSliceOfDynamicObjects(siz, f.PayloadAttributes)
-	size += ssz.SizeSliceOfStaticObjects(siz, f.CustodyColumns)
+	if siz.Fork() >= forkAmsterdam {
+		size += ssz.SizeSliceOfStaticObjects(siz, f.CustodyColumns)
+	}
 	return size
 }
 
 func (f *ForkchoiceUpdateAmsterdam) DefineSSZ(c *ssz.Codec) {
 	ssz.DefineStaticObject(c, &f.ForkchoiceState)
 	ssz.DefineSliceOfDynamicObjectsOffset(c, &f.PayloadAttributes, 1)
-	ssz.DefineSliceOfStaticObjectsOffset(c, &f.CustodyColumns, 1)
+	ssz.DefineSliceOfStaticObjectsOffsetOnFork(c, &f.CustodyColumns, 1, fromAmsterdam)
 
 	ssz.DefineSliceOfDynamicObjectsContent(c, &f.PayloadAttributes, 1)
-	ssz.DefineSliceOfStaticObjectsContent(c, &f.CustodyColumns, 1)
+	ssz.DefineSliceOfStaticObjectsContentOnFork(c, &f.CustodyColumns, 1, fromAmsterdam)
 }
 
 // Validate enforces the Optional[T] = List[T,1] length invariants.

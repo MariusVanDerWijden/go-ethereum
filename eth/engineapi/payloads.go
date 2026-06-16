@@ -27,9 +27,9 @@ import (
 
 // handleNewPayload implements POST /engine/v2/{fork}/payloads.
 func (rt *Router) handleNewPayload(w http.ResponseWriter, r *http.Request, fork forks.Fork) {
-	// The execution-apis spec currently only defines the payload envelope for
-	// Amsterdam; the inner payload shape is fork-driven by the codec.
-	sf, ok := resolveFork(w, fork, forks.Amsterdam)
+	// The Amsterdam payload envelope is the universal wire shape; the inner
+	// payload is fork-driven by the codec down to Paris.
+	sf, ok := resolveFork(w, fork, forks.Paris)
 	if !ok {
 		return
 	}

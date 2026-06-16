@@ -39,3 +39,23 @@ func resolveFork(w http.ResponseWriter, fork, min forks.Fork) (ssz.Fork, bool) {
 	}
 	return sf, true
 }
+
+// baseEngineFork collapses Blob-Parameter-Only forks (BPO1..BPO5) onto their
+// base protocol fork (Osaka), which is the one with a fork-scoped engine URL.
+func baseEngineFork(f forks.Fork) forks.Fork {
+	switch f {
+	case forks.BPO1, forks.BPO2, forks.BPO3, forks.BPO4, forks.BPO5:
+		return forks.Osaka
+	default:
+		return f
+	}
+}
+
+// eraForks returns the fork plus the BPO forks layered on it, for validating a
+// built payload's timestamp-derived fork (which LatestFork may report as a BPO).
+func eraForks(fork forks.Fork) []forks.Fork {
+	if fork == forks.Osaka {
+		return []forks.Fork{forks.Osaka, forks.BPO1, forks.BPO2, forks.BPO3, forks.BPO4, forks.BPO5}
+	}
+	return []forks.Fork{fork}
+}
